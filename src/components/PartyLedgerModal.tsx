@@ -26,12 +26,13 @@ import {
 
 interface PartyLedgerModalProps {
   partyName: string | null;
+  groupName?: string | null;
   companyId: string;
   onClose: () => void;
   onVoucherIgnored?: () => void;
 }
 
-export default function PartyLedgerModal({ partyName, companyId, onClose, onVoucherIgnored }: PartyLedgerModalProps) {
+export default function PartyLedgerModal({ partyName, groupName, companyId, onClose, onVoucherIgnored }: PartyLedgerModalProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,17 +42,27 @@ export default function PartyLedgerModal({ partyName, companyId, onClose, onVouc
   const [ledgerLayout, setLedgerLayout] = useState<'t_table' | 't_twosided'>('t_table');
   const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [isGroupMode, setIsGroupMode] = useState<boolean>(!!groupName);
 
   useEffect(() => {
-    if (!partyName || !companyId) return;
+    if (!partyName && !groupName) return;
+    if (!companyId) return;
     fetchLedger();
-  }, [partyName, companyId, selectedBranch, selectedVType]);
+  }, [partyName, groupName, companyId, selectedBranch, selectedVType, isGroupMode]);
 
   async function fetchLedger() {
     setLoading(true);
     setError(null);
     try {
-      let url = `/api/ledgers/details?companyId=${encodeURIComponent(companyId)}&partyName=${encodeURIComponent(partyName!)}`;
+      let url = `/api/ledgers/details?companyId=${encodeURIComponent(companyId)}`;
+      if (isGroupMode && (groupName || data?.groupInfo?.groupName)) {
+        url += `&groupName=${encodeURIComponent(groupName || data.groupInfo.groupName)}`;
+      } else if (partyName) {
+        url += `&partyName=${encodeURIComponent(partyName)}`;
+      } else if (groupName) {
+        url += `&groupName=${encodeURIComponent(groupName)}`;
+      }
+
       if (selectedBranch !== 'all') {
         url += `&branchId=${encodeURIComponent(selectedBranch)}`;
       }

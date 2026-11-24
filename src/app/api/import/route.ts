@@ -148,9 +148,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Prepare party balance documents
+    // Fetch persistent rules for this company: Branch mappings and Group mappings
+    const [branchMappings, groupMappings] = await Promise.all([
+      db.collection('branch_ledger_mappings').find({ companyId }).toArray(),
+      db.collection('ledger_groups').find({ companyId }).toArray()
+    ]);
+
+    const branchMappingMap = new Map<string, any>();
+    branchMappings.forEach(m => {
+      branchMappingMap.set(`${m.branchId}_${m.partyName}`, m);
+      branchMappingMap.set(m.partyName, m); // Fallback company-wide
+    });
+
+    const groupMappingMap = new Map<string, string>();
+    groupMappings.forEach(g => {
+      groupMappingMap.set(g.partyName, g.groupName);
+    });
+
+    let autoAppliedBranchCount = 0;
+    let autoAppliedGroupCount = 0;
+
+    // Prepare party balance documents with persistent rules auto-attached
     const partyDocs = Array.from(partyMap.values()).map(p => {
       const netBalance = Math.round((p.totalDebit - p.totalCredit) * 100) / 100;
+      
+      const bMap = branchMappingMap.get(`${branchId}_${p.partyName}`) || branchMappingMap.get(p.partyName);
+      const grpName = groupMappingMap.get(p.partyName);
+
+      if (bMap) autoAppliedBranchCount++;
+      if (grpName) autoAppliedGroupCount++;
+
       return {
         companyId,
         companyName,
@@ -163,6 +190,14 @@ export async function POST(req: NextRequest) {
         status: netBalance > 0.01 ? 'Dr' : (netBalance < -0.01 ? 'Cr' : 'Nil'),
         voucherCount: p.voucherCount,
         voucherTypes: p.voucherTypes,
+        // Auto-attached from persistent branch declarations
+        isBranchAccount: !!bMap,
+        mappedBranchCode: bMap ? (bMap.targetBranchCode || '') : '',
+        targetBranchId: bMap ? (bMap.targetBranchId || '') : '',
+        targetBranchName: bMap ? (bMap.targetBranchName || '') : '',
+        // Auto-attached from persistent ledger groups
+        isGrouped: !!grpName,
+        groupName: grpName || '',
         updatedAt: new Date()
       };
     });
@@ -181,6 +216,8 @@ export async function POST(req: NextRequest) {
         totalParties: partyDocs.length,
         branchName,
         companyName,
+        autoAppliedBranchCount,
+        autoAppliedGroupCount,
         voucherTypesBreakdown: voucherTypeSummary
       }
     });

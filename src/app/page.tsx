@@ -21,6 +21,8 @@ import {
   Eye,
   TrendingUp,
   TrendingDown,
+  ArrowDownRight,
+  ArrowUpRight,
   Scale,
   Sparkles,
   Zap,
@@ -30,13 +32,19 @@ import {
   Globe2,
   Ban,
   RotateCcw,
-  ShieldAlert
+  ShieldAlert,
+  FolderKanban,
+  Users2,
+  Boxes,
+  Split,
+  GitCompare,
+  FilterX
 } from 'lucide-react';
 import PartyLedgerModal from '@/components/PartyLedgerModal';
 
 export default function Dashboard() {
-  // Navigation tabs: added 'exceptions' tab
-  const [activeTab, setActiveTab] = useState<'matrix' | 'declare' | 'interbranch' | 'exceptions' | 'branches' | 'reset'>('matrix');
+  // Navigation tabs: matrix, groups, declare, interbranch, exceptions, branches, reset
+  const [activeTab, setActiveTab] = useState<'matrix' | 'groups' | 'declare' | 'interbranch' | 'exceptions' | 'branches' | 'reset'>('matrix');
 
   // Company State
   const [companies, setCompanies] = useState<any[]>([]);
@@ -63,10 +71,22 @@ export default function Dashboard() {
   const [matrixData, setMatrixData] = useState<any>(null);
   const [matrixLoading, setMatrixLoading] = useState<boolean>(false);
   const [matrixSearch, setMatrixSearch] = useState<string>('');
-  const [matrixFilter, setMatrixFilter] = useState<'all' | 'multi_branch' | 'dr' | 'cr'>('all');
+  const [matrixFilter, setMatrixFilter] = useState<'all' | 'multi_branch' | 'dr' | 'cr' | 'grouped' | 'ungrouped'>('all');
+  const [matrixViewMode, setMatrixViewMode] = useState<'individual' | 'groups'>('individual');
 
-  // 360 Party Ledger Modal State
+  // 360 Party & Group Ledger Modal State
   const [selectedParty, setSelectedParty] = useState<string | null>(null);
+  const [selectedGroupModal, setSelectedGroupModal] = useState<string | null>(null);
+
+  // Ledger Groups State
+  const [groupsData, setGroupsData] = useState<any[]>([]);
+  const [groupParties, setGroupParties] = useState<any[]>([]);
+  const [groupNamesList, setGroupNamesList] = useState<string[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState<boolean>(false);
+  const [groupSearch, setGroupSearch] = useState<string>('');
+  const [groupSelectedParties, setGroupSelectedParties] = useState<string[]>([]);
+  const [newGroupNameInput, setNewGroupNameInput] = useState<string>('');
+  const [existingGroupSelect, setExistingGroupSelect] = useState<string>('');
 
   // Branch Ledger Declaration State (Declare Ledgers as Branch with Code)
   const [declareLedgers, setDeclareLedgers] = useState<any[]>([]);
@@ -77,11 +97,14 @@ export default function Dashboard() {
   const [declaredOnlyFilter, setDeclaredOnlyFilter] = useState<boolean>(false);
   const [availableDeclaredCodes, setAvailableDeclaredCodes] = useState<string[]>([]);
 
-  // Inter-Branch State
+  // Inter-Branch Two-Way Reconciliation State
   const [ibBranch1, setIbBranch1] = useState<string>('');
   const [ibBranch2, setIbBranch2] = useState<string>('');
   const [ibData, setIbData] = useState<any>(null);
   const [ibLoading, setIbLoading] = useState<boolean>(false);
+  const [ibStatusFilter, setIbStatusFilter] = useState<'mismatch_only' | 'all' | 'matched_only' | 'missing_in_b2' | 'missing_in_b1'>('mismatch_only');
+  const [ibTypeFilter, setIbTypeFilter] = useState<'all' | 'payment_receipt' | 'sale_purchase' | 'journal_other'>('all');
+  const [ibSearch, setIbSearch] = useState<string>('');
 
   // Exceptions Report State
   const [exceptions, setExceptions] = useState<any[]>([]);
@@ -90,7 +113,7 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   // Reset State
-  const [resetModal, setResetModal] = useState<{ open: boolean; type: 'branch' | 'company' | 'all'; id?: string; name?: string }>({
+  const [resetModal, setResetModal] = useState<{ open: boolean; type: 'branch' | 'company' | 'all' | 'transactions'; id?: string; name?: string }>({
     open: false,
     type: 'company'
   });
@@ -436,6 +459,104 @@ export default function Dashboard() {
     }
   }
 
+  // Fetch Groups
+  async function fetchGroups(companyId: string, search = groupSearch) {
+    if (!companyId) return;
+    setGroupsLoading(true);
+    try {
+      let url = `/api/groups?companyId=${companyId}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.success) {
+        setGroupsData(json.groups || []);
+        setGroupParties(json.parties || []);
+        setGroupNamesList(json.groupNames || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }
+
+  // Assign Group
+  async function handleAssignGroup() {
+    const targetGroup = (newGroupNameInput.trim() || existingGroupSelect.trim());
+    if (!targetGroup) {
+      showToast('कृपया ग्रुप का नाम दर्ज करें या मौजूदा ग्रुप चुनें', 'error');
+      return;
+    }
+    if (groupSelectedParties.length === 0) {
+      showToast('कृपया कम से कम एक लेजर चुनें', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: selectedCompanyId,
+          groupName: targetGroup,
+          partyNames: groupSelectedParties
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        setGroupSelectedParties([]);
+        setNewGroupNameInput('');
+        setExistingGroupSelect('');
+        await fetchGroups(selectedCompanyId);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Failed to assign group', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Remove single party from group
+  async function handleRemovePartyFromGroup(partyName: string) {
+    try {
+      const res = await fetch(`/api/groups?companyId=${selectedCompanyId}&partyName=${encodeURIComponent(partyName)}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        await fetchGroups(selectedCompanyId);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Failed to remove from group', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Delete entire group
+  async function handleDeleteGroup(groupName: string) {
+    if (!confirm(`क्या आप पूरा ग्रुप "${groupName}" हटाना चाहते हैं? इसके सभी लेजर्स सामान्य लेजर्स बन जाएंगे।`)) return;
+    try {
+      const res = await fetch(`/api/groups?companyId=${selectedCompanyId}&groupName=${encodeURIComponent(groupName)}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        await fetchGroups(selectedCompanyId);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Failed to delete group', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
   // Inter-Branch Reconciliation Fetch
   async function fetchInterBranch() {
     if (!selectedCompanyId) return;
@@ -444,6 +565,9 @@ export default function Dashboard() {
       let url = `/api/reconciliation/inter-branch?companyId=${selectedCompanyId}`;
       if (ibBranch1) url += `&branch1Id=${ibBranch1}`;
       if (ibBranch2) url += `&branch2Id=${ibBranch2}`;
+      if (ibStatusFilter) url += `&statusFilter=${ibStatusFilter}`;
+      if (ibTypeFilter) url += `&typeFilter=${ibTypeFilter}`;
+      if (ibSearch) url += `&search=${encodeURIComponent(ibSearch)}`;
 
       const res = await fetch(url);
       const json = await res.json();
@@ -461,7 +585,16 @@ export default function Dashboard() {
     if (activeTab === 'interbranch') {
       fetchInterBranch();
     }
-  }, [activeTab, ibBranch1, ibBranch2, selectedCompanyId]);
+  }, [activeTab, ibBranch1, ibBranch2, ibStatusFilter, ibTypeFilter, ibSearch, selectedCompanyId]);
+
+  useEffect(() => {
+    if (activeTab === 'groups' && selectedCompanyId) {
+      const timer = setTimeout(() => {
+        fetchGroups(selectedCompanyId, groupSearch);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, groupSearch, selectedCompanyId]);
 
   // Execute Reset
   async function executeReset() {
@@ -486,10 +619,12 @@ export default function Dashboard() {
           setMatrixData(null);
           setBranches([]);
           setExceptions([]);
+          setGroupsData([]);
         } else {
           await fetchBranches(selectedCompanyId);
           await fetchMatrix(selectedCompanyId);
           await fetchExceptions(selectedCompanyId);
+          await fetchGroups(selectedCompanyId);
         }
       } else {
         showToast(json.error || 'Reset failed', 'error');
@@ -595,6 +730,24 @@ export default function Dashboard() {
             <span>पार्टी मैट्रिक्स (Party Matrix)</span>
           </button>
 
+          {/* New Tab: Ledger Grouping */}
+          <button
+            onClick={() => setActiveTab('groups')}
+            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+              activeTab === 'groups'
+                ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Boxes className="w-4 h-4 text-amber-400" />
+            <span>लेजर ग्रुपिंग (Ledger Grouping)</span>
+            {groupsData.length > 0 && (
+              <span className="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                {groupsData.length}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveTab('declare')}
             className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
@@ -604,7 +757,7 @@ export default function Dashboard() {
             }`}
           >
             <Tag className="w-4 h-4 text-purple-400" />
-            <span>लेजर को ब्रांच कोड दें (Declare Branch by Code)</span>
+            <span>लेजर को कोड मैप करें (Map Entity Code)</span>
           </button>
 
           <button
@@ -615,11 +768,10 @@ export default function Dashboard() {
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ArrowRightLeft className="w-4 h-4" />
-            <span>आपसी ब्रांच मिलान (Inter-Branch Matching)</span>
+            <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
+            <span>आपसी मिलान व मिसमैच (Reconciliation & Mismatches)</span>
           </button>
 
-          {/* New Tab: Exceptions Report */}
           <button
             onClick={() => setActiveTab('exceptions')}
             className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
@@ -776,6 +928,27 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* View Mode Toggle: Individual vs Groups */}
+              <div className="flex items-center space-x-1 bg-indigo-50 border border-indigo-200 p-1 rounded-xl text-xs font-bold">
+                <button
+                  onClick={() => setMatrixViewMode('individual')}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    matrixViewMode === 'individual' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
+                  }`}
+                >
+                  व्यक्तिगत लेजर्स (Individual)
+                </button>
+                <button
+                  onClick={() => setMatrixViewMode('groups')}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1 ${
+                    matrixViewMode === 'groups' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
+                  }`}
+                >
+                  <Boxes className="w-3.5 h-3.5" />
+                  <span>ग्रुप दृश्य (Group View {matrixData?.groups?.length ? `(${matrixData.groups.length})` : ''})</span>
+                </button>
+              </div>
+
               <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                 <button
                   onClick={() => setMatrixFilter('all')}
@@ -838,7 +1011,9 @@ export default function Dashboard() {
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-100/90 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
                     <tr>
-                      <th className="px-5 py-3.5">पार्टी का नाम (Party / Ledger Name)</th>
+                      <th className="px-5 py-3.5">
+                        {matrixViewMode === 'groups' ? 'ग्रुप का नाम (Ledger Group Name)' : 'पार्टी का नाम (Party / Ledger Name)'}
+                      </th>
                       
                       {matrixData?.branches?.map((b: any) => (
                         <th key={b.id} className="px-4 py-3.5 text-right whitespace-nowrap">
@@ -864,7 +1039,110 @@ export default function Dashboard() {
                       </tr>
                     )}
 
-                    {!matrixLoading && (!matrixData?.parties || matrixData.parties.length === 0) && (
+                    {/* VIEW 1: GROUP VIEW */}
+                    {!matrixLoading && matrixViewMode === 'groups' && (
+                      <>
+                        {(!matrixData?.groups || matrixData.groups.length === 0) ? (
+                          <tr>
+                            <td colSpan={6 + (matrixData?.branches?.length || 0)} className="py-12 text-center text-slate-400">
+                              <Boxes className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                              <p className="font-semibold text-slate-600">कोई लेजर ग्रुप नहीं मिला</p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                "लेजर ग्रुपिंग" टैब में जाकर लेजर्स को ग्रुप में समूहित करें।
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
+                          matrixData.groups.map((g: any) => (
+                            <tr
+                              key={g.groupName}
+                              onClick={() => setSelectedGroupModal(g.groupName)}
+                              className="hover:bg-amber-50/40 cursor-pointer transition bg-amber-50/10"
+                            >
+                              <td className="px-5 py-3 text-slate-900 font-bold max-w-xs">
+                                <div className="space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-extrabold text-indigo-900 text-sm">📁 {g.groupName}</span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                      {g.parties?.length || 0} Accounts
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 truncate" title={g.parties?.join(', ')}>
+                                    {g.parties?.join(', ')}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {matrixData?.branches?.map((b: any) => {
+                                const bInfo = g.branchBalances?.[b.id];
+                                if (!bInfo || bInfo.net === 0) {
+                                  return (
+                                    <td key={b.id} className="px-4 py-3 text-right text-slate-300 font-mono">
+                                      -
+                                    </td>
+                                  );
+                                }
+                                return (
+                                  <td key={b.id} className="px-4 py-3 text-right whitespace-nowrap">
+                                    <span className={`font-bold font-mono ${
+                                      bInfo.status === 'Dr' ? 'text-amber-700' : bInfo.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
+                                    }`}>
+                                      {formatCurrency(Math.abs(bInfo.net))}
+                                    </span>
+                                    <span className={`text-[10px] ml-1 font-bold ${
+                                      bInfo.status === 'Dr' ? 'text-amber-600' : 'text-emerald-600'
+                                    }`}>
+                                      {bInfo.status}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+
+                              <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                {g.totalDebit > 0 ? formatCurrency(g.totalDebit) : '-'}
+                              </td>
+
+                              <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                                {g.totalCredit > 0 ? formatCurrency(g.totalCredit) : '-'}
+                              </td>
+
+                              <td className="px-5 py-3 text-right whitespace-nowrap">
+                                <span className={`font-black text-sm font-mono ${
+                                  g.status === 'Dr' ? 'text-amber-700' : g.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
+                                }`}>
+                                  {formatCurrency(Math.abs(g.netBalance))}
+                                </span>
+                                <span className={`px-2 py-0.5 ml-2 text-[10px] font-bold rounded-full ${
+                                  g.status === 'Dr'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : g.status === 'Cr'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {g.status === 'Dr' ? 'लेना है (Dr)' : g.status === 'Cr' ? 'देना है (Cr)' : 'NIL'}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedGroupModal(g.groupName);
+                                  }}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-bold transition shadow-2xs"
+                                >
+                                  <Boxes className="w-3.5 h-3.5" />
+                                  <span>Group Ledger</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </>
+                    )}
+
+                    {/* VIEW 2: INDIVIDUAL VIEW */}
+                    {!matrixLoading && matrixViewMode === 'individual' && (!matrixData?.parties || matrixData.parties.length === 0) && (
                       <tr>
                         <td colSpan={6 + (matrixData?.branches?.length || 0)} className="py-12 text-center text-slate-400">
                           <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -873,20 +1151,34 @@ export default function Dashboard() {
                       </tr>
                     )}
 
-                    {!matrixLoading && matrixData?.parties?.map((p: any) => (
+                    {!matrixLoading && matrixViewMode === 'individual' && matrixData?.parties?.map((p: any) => (
                       <tr
                         key={p.partyName}
                         onClick={() => setSelectedParty(p.partyName)}
                         className="hover:bg-indigo-50/40 cursor-pointer transition"
                       >
                         <td className="px-5 py-3 text-slate-900 font-semibold max-w-xs">
-                          <div className="flex items-center space-x-2">
-                            <span className="truncate">{p.partyName}</span>
-                            {p.isMultiBranch && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                                {p.branchesCount} Branches
-                              </span>
-                            )}
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="truncate font-bold">{p.partyName}</span>
+                              {p.isMultiBranch && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
+                                  {p.branchesCount} Branches
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                              {p.isGrouped && p.groupName && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  📁 {p.groupName}
+                                </span>
+                              )}
+                              {p.isBranchAccount && p.mappedBranchCode && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200 font-mono">
+                                  🏷️ {p.mappedBranchCode}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
 
@@ -1216,15 +1508,325 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ==================== TAB 3: INTER-BRANCH RECONCILIATION ==================== */}
+        {/* ==================== TAB 2: LEDGER GROUPING ==================== */}
+        {companies.length > 0 && activeTab === 'groups' && (
+          <div className="space-y-6">
+            
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Boxes className="w-5 h-5 text-amber-500" />
+                  <h2 className="text-lg font-bold text-slate-900">
+                    लेजर ग्रुपिंग प्रबंधन (Party / Ledger Grouping)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  विभिन्न नामों या स्पेलिंग वाले लेजर्स को एक ही मुख्य ग्रुप/पार्टी (जैसे "Group A" या "Amol Bansal Group") में समूहित करें। नया डेटा अपलोड करने पर भी ये ग्रुप्स हमेशा सुरक्षित और ऑटो-अप्लाई रहेंगे।
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => fetchGroups(selectedCompanyId)}
+                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                  title="Refresh Groups"
+                >
+                  <RefreshCw className={`w-4 h-4 ${groupsLoading ? 'animate-spin text-amber-600' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Grid: Left = Existing Groups, Right = Assign Ledgers */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left Column: Existing Groups List (5 cols) */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center space-x-2">
+                      <FolderKanban className="w-4 h-4 text-indigo-600" />
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        बनाए गए ग्रुप्स (Created Groups) ({groupsData.length})
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-400">Total Groups</span>
+                  </div>
+
+                  {groupsData.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 space-y-2">
+                      <Boxes className="w-10 h-10 mx-auto text-slate-300" />
+                      <p className="text-xs font-semibold">अभी तक कोई ग्रुप नहीं बना है</p>
+                      <p className="text-[11px] text-slate-400">
+                        दाईं ओर दी गई सूची से लेजर्स को सेलेक्ट करें और नया ग्रुप नाम देकर जोड़ें।
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                      {groupsData.map((g: any) => (
+                        <div
+                          key={g.groupName}
+                          className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition space-y-3"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-extrabold text-slate-900 text-sm">{g.groupName}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  {g.partyCount} Accounts
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono">Consolidated Group Position</span>
+                            </div>
+
+                            <div className="text-right">
+                              <span className={`text-xs font-black font-mono px-2 py-0.5 rounded-lg ${
+                                g.status === 'Dr' ? 'bg-amber-100 text-amber-800' : g.status === 'Cr' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                              }`}>
+                                {formatCurrency(Math.abs(g.netBalance))} {g.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Member Parties Tags */}
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              शामिल खाते (Member Accounts):
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                              {g.parties.map((p: any) => (
+                                <span
+                                  key={p.partyName}
+                                  className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-medium text-slate-800 shadow-2xs"
+                                >
+                                  <span>{p.partyName}</span>
+                                  <button
+                                    onClick={() => handleRemovePartyFromGroup(p.partyName)}
+                                    className="text-slate-400 hover:text-rose-600 transition ml-1"
+                                    title="ग्रुप से निकालें"
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                            <button
+                              onClick={() => setSelectedGroupModal(g.groupName)}
+                              className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 font-bold text-xs transition"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>संयुक्त लेजर देखें (Combined Ledger) →</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteGroup(g.groupName)}
+                              className="text-rose-600 hover:text-rose-800 text-[11px] font-semibold transition"
+                            >
+                              ग्रुप हटाएं (Delete)
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Select & Assign Ledgers (7 cols) */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center space-x-2">
+                      <Users2 className="w-4 h-4 text-purple-600" />
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        लेजर्स चुनें और ग्रुप में जोड़ें (Assign Ledgers to Group)
+                      </h3>
+                    </div>
+                    {groupSelectedParties.length > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                        {groupSelectedParties.length} Selected
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Assign Action Bar */}
+                  <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+                    <span className="text-[11px] font-bold text-purple-900 block">
+                      चयनित लेजर्स को ग्रुप असाइन करें:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="नया ग्रुप नाम (उदा. Group A)..."
+                        value={newGroupNameInput}
+                        onChange={(e) => {
+                          setNewGroupNameInput(e.target.value);
+                          if (e.target.value) setExistingGroupSelect('');
+                        }}
+                        className="flex-1 bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 min-w-[160px]"
+                      />
+
+                      {groupNamesList.length > 0 && (
+                        <select
+                          value={existingGroupSelect}
+                          onChange={(e) => {
+                            setExistingGroupSelect(e.target.value);
+                            if (e.target.value) setNewGroupNameInput('');
+                          }}
+                          className="bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="">-- या मौजूदा ग्रुप चुनें --</option>
+                          {groupNamesList.map((gn) => (
+                            <option key={gn} value={gn}>{gn}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      <button
+                        onClick={handleAssignGroup}
+                        disabled={groupSelectedParties.length === 0 || (!newGroupNameInput.trim() && !existingGroupSelect.trim())}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-sm transition whitespace-nowrap"
+                      >
+                        ग्रुप असाइन करें ({groupSelectedParties.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2">
+                    <Search className="w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="पार्टी का नाम खोजें (उदा. Amol, Bansal, Utrakshi)..."
+                      value={groupSearch}
+                      onChange={(e) => setGroupSearch(e.target.value)}
+                      className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                    />
+                    {groupSearch && (
+                      <button onClick={() => setGroupSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Party Selection Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[440px] overflow-y-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] sticky top-0 border-b border-slate-200">
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={groupParties.length > 0 && groupSelectedParties.length === groupParties.length}
+                              onChange={() => {
+                                if (groupSelectedParties.length === groupParties.length) {
+                                  setGroupSelectedParties([]);
+                                } else {
+                                  setGroupSelectedParties(groupParties.map(p => p.partyName));
+                                }
+                              }}
+                              className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            />
+                          </th>
+                          <th className="px-3 py-2.5">पार्टी का नाम (Party Name)</th>
+                          <th className="px-3 py-2.5">मौजूदा ग्रुप (Current Group)</th>
+                          <th className="px-3 py-2.5 text-right">Net Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {groupParties.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-slate-400">
+                              No accounts found matching search
+                            </td>
+                          </tr>
+                        ) : (
+                          groupParties.map((p) => {
+                            const isChecked = groupSelectedParties.includes(p.partyName);
+                            return (
+                              <tr
+                                key={p.partyName}
+                                onClick={() => {
+                                  if (isChecked) {
+                                    setGroupSelectedParties(groupSelectedParties.filter(n => n !== p.partyName));
+                                  } else {
+                                    setGroupSelectedParties([...groupSelectedParties, p.partyName]);
+                                  }
+                                }}
+                                className={`hover:bg-purple-50/30 transition cursor-pointer ${
+                                  isChecked ? 'bg-purple-50/50' : ''
+                                }`}
+                              >
+                                <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setGroupSelectedParties(groupSelectedParties.filter(n => n !== p.partyName));
+                                      } else {
+                                        setGroupSelectedParties([...groupSelectedParties, p.partyName]);
+                                      }
+                                    }}
+                                    className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 font-bold text-slate-900">
+                                  {p.partyName}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {p.isGrouped && p.groupName ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                      📁 {p.groupName}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-[11px]">Ungrouped</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono font-bold">
+                                  <span className={p.status === 'Dr' ? 'text-amber-700' : p.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'}>
+                                    {formatCurrency(Math.abs(p.netBalance))}
+                                  </span>
+                                  <span className={`text-[10px] ml-1 font-bold ${
+                                    p.status === 'Dr' ? 'text-amber-600' : 'text-emerald-600'
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* ==================== TAB 3: INTER-BRANCH TWO-WAY RECONCILIATION & MISMATCHES ==================== */}
         {companies.length > 0 && activeTab === 'interbranch' && (
           <div className="space-y-6">
             
-            <div className="flex items-center justify-between">
+            {/* Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">आपसी ब्रांच रिकंसीलेशन (Inter-Branch Books Reconciliation)</h2>
-                <p className="text-xs text-slate-500">
-                  दो ब्रांचेस के डिक्लेयर्ड कोड अनुसार खातों का मिलान करें और अंतर (Mismatch / Discrepancy) जांचें
+                <div className="flex items-center space-x-2">
+                  <ArrowRightLeft className="w-5 h-5 text-cyan-600" />
+                  <h2 className="text-lg font-bold text-slate-900">
+                    आपसी कंपनी/ब्रांच मिलान व मिसमैच (Cross-Entity Reconciliation & Mismatches)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  स्पेलिंग भिन्नता की समस्या को दूर करने के लिए एंटिटी कोड (Entity Code) के आधार पर दोनों किताबों का दो-तरफा मिलान किया जाता है। मैच हुई एंट्रियां हटाकर सिर्फ मिसमैच एंट्रियां दिखाई जाती हैं।
                 </p>
               </div>
 
@@ -1234,191 +1836,529 @@ export default function Dashboard() {
                   className="inline-flex items-center space-x-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition"
                 >
                   <Tag className="w-3.5 h-3.5" />
-                  <span>लेजर को कोड दें</span>
+                  <span>लेजर को कोड मैप करें</span>
                 </button>
 
                 <button
                   onClick={fetchInterBranch}
                   className="inline-flex items-center space-x-1 px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${ibLoading ? 'animate-spin' : ''}`} />
-                  <span>Re-check Books</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${ibLoading ? 'animate-spin text-cyan-600' : ''}`} />
+                  <span>Re-check Matching</span>
                 </button>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    First Branch (ब्रांच 1)
-                  </label>
+            {/* Branch Selection Bar with Entity Codes */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Branch 1 Card */}
+                <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center space-x-1.5">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      <span>First Entity / Branch (बुक 1)</span>
+                    </label>
+                    {ibData?.selected?.branch1?.code && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white font-mono shadow-xs">
+                        CODE: {ibData.selected.branch1.code}
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={ibBranch1}
                     onChange={(e) => setIbBranch1(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
+                        {b.name} (Code: {b.code})
                       </option>
                     ))}
                   </select>
+
+                  <div className="text-[11px] text-blue-900/80">
+                    <span className="font-semibold">बुक 2 को दर्शाने वाले लेजर्स: </span>
+                    {ibData?.selected?.branch1?.mappedLedgers?.length > 0 ? (
+                      <span className="font-bold underline text-blue-900">
+                        {ibData.selected.branch1.mappedLedgers.join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-rose-600 font-semibold italic">
+                        कोई लेजर कोड से मैप नहीं है। <button onClick={() => setActiveTab('declare')} className="underline">कोड मैप करें</button>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Second Branch (ब्रांच 2)
-                  </label>
+                {/* Branch 2 Card */}
+                <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center space-x-1.5">
+                      <Building2 className="w-4 h-4 text-purple-600" />
+                      <span>Second Entity / Branch (बुक 2)</span>
+                    </label>
+                    {ibData?.selected?.branch2?.code && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-600 text-white font-mono shadow-xs">
+                        CODE: {ibData.selected.branch2.code}
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={ibBranch2}
                     onChange={(e) => setIbBranch2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
+                        {b.name} (Code: {b.code})
                       </option>
                     ))}
                   </select>
+
+                  <div className="text-[11px] text-purple-900/80">
+                    <span className="font-semibold">बुक 1 को दर्शाने वाले लेजर्स: </span>
+                    {ibData?.selected?.branch2?.mappedLedgers?.length > 0 ? (
+                      <span className="font-bold underline text-purple-900">
+                        {ibData.selected.branch2.mappedLedgers.join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-rose-600 font-semibold italic">
+                        कोई लेजर कोड से मैप नहीं है। <button onClick={() => setActiveTab('declare')} className="underline">कोड मैप करें</button>
+                      </span>
+                    )}
+                  </div>
                 </div>
+
               </div>
             </div>
 
-            {ibData?.reconciliation && (
-              <>
-                <div className={`p-4 rounded-2xl border flex items-center justify-between ${
-                  ibData.reconciliation.isReconciled
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border-rose-200 text-rose-900'
-                }`}>
-                  <div className="flex items-center space-x-3">
-                    {ibData.reconciliation.isReconciled ? (
-                      <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
-                    ) : (
-                      <AlertTriangle className="w-8 h-8 text-rose-600 shrink-0" />
-                    )}
-                    <div>
-                      <h4 className="font-extrabold text-base">
-                        {ibData.reconciliation.statusText}
-                      </h4>
-                      <p className="text-xs mt-0.5 opacity-90">
-                        {ibData.reconciliation.isReconciled
-                          ? 'दोनों ब्रांचेस के आपसी खाते पूर्ण रूप से मेल खाते हैं (0 Difference).'
-                          : `अंतर राशि: ₹${ibData.reconciliation.difference.toLocaleString('en-IN')}.`}
-                      </p>
-                    </div>
+            {/* Reconciliation KPI Summary Cards */}
+            {ibData?.summary && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                
+                {/* Total Mismatches Card */}
+                <div className="bg-white border-2 border-rose-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3 bg-rose-50/30">
+                  <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
                   </div>
-
-                  <div className="text-right">
-                    <span className="text-xs uppercase font-bold tracking-wider opacity-75">Net Difference</span>
-                    <div className="text-xl font-black font-mono">
-                      {formatCurrency(ibData.reconciliation.difference)}
+                  <div>
+                    <div className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider">
+                      कुल मिसमैच (Mismatches)
                     </div>
+                    <div className="text-xl font-black text-rose-700 mt-0.5">
+                      {ibData.summary.totalMismatches} Entries
+                    </div>
+                    <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
+                      Diff: {formatCurrency(ibData.summary.missingInB2Amount + ibData.summary.missingInB1Amount)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch1Book.branchName}</h4>
-                        <span className="text-xs text-slate-500 font-mono">Branch Code: {ibData.reconciliation.branch1Book.branchCode}</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ibData.reconciliation.branch1Book.balanceType === 'Dr'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {formatCurrency(Math.abs(ibData.reconciliation.branch1Book.netBalance))} {ibData.reconciliation.branch1Book.balanceType}
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1">
-                      <span className="text-slate-500 font-bold">Accounts representing other branch:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ibData.reconciliation.branch1Book.matchedAccounts.length === 0 ? (
-                          <div className="text-slate-400 italic text-xs py-1">
-                            कोई लेजर इस ब्रांच कोड से लिंक नहीं है। <button onClick={() => setActiveTab('declare')} className="text-purple-600 underline font-semibold">लेजर को कोड दें</button>
-                          </div>
-                        ) : (
-                          ibData.reconciliation.branch1Book.matchedAccounts.map((a: any) => (
-                            <span key={a.name} className="px-2 py-0.5 bg-purple-50 border border-purple-200 rounded text-purple-900 font-semibold">
-                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 text-xs">
-                      <span className="text-slate-500 block mb-2 font-bold">Recent Cross Vouchers:</span>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                        {ibData.reconciliation.branch1Book.vouchers.length === 0 ? (
-                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
-                        ) : (
-                          ibData.reconciliation.branch1Book.vouchers.map((v: any) => (
-                            <div key={v._id} className="py-1.5 flex justify-between">
-                              <span className="text-slate-600 font-mono">{v.dateStr} ({v.voucherType})</span>
-                              <span className="font-mono font-semibold">{v.primaryParty}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                {/* Missing in B2 Card */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
+                  <div className="p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+                    <ArrowDownRight className="w-6 h-6" />
                   </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch2Book.branchName}</h4>
-                        <span className="text-xs text-slate-500 font-mono">Branch Code: {ibData.reconciliation.branch2Book.branchCode}</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ibData.reconciliation.branch2Book.balanceType === 'Dr'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {formatCurrency(Math.abs(ibData.reconciliation.branch2Book.netBalance))} {ibData.reconciliation.branch2Book.balanceType}
-                      </span>
+                  <div>
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      बुक 2 में गायब (Missing in B2)
                     </div>
-
-                    <div className="text-xs space-y-1">
-                      <span className="text-slate-500 font-bold">Accounts representing other branch:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ibData.reconciliation.branch2Book.matchedAccounts.length === 0 ? (
-                          <div className="text-slate-400 italic text-xs py-1">
-                            कोई लेजर इस ब्रांच कोड से लिंक नहीं है। <button onClick={() => setActiveTab('declare')} className="text-purple-600 underline font-semibold">लेजर को कोड दें</button>
-                          </div>
-                        ) : (
-                          ibData.reconciliation.branch2Book.matchedAccounts.map((a: any) => (
-                            <span key={a.name} className="px-2 py-0.5 bg-purple-50 border border-purple-200 rounded text-purple-900 font-semibold">
-                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
-                            </span>
-                          ))
-                        )}
-                      </div>
+                    <div className="text-lg font-black text-amber-700 mt-0.5">
+                      {ibData.summary.missingInB2Count} Entries
                     </div>
-
-                    <div className="pt-2 text-xs">
-                      <span className="text-slate-500 block mb-2 font-bold">Recent Cross Vouchers:</span>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                        {ibData.reconciliation.branch2Book.vouchers.length === 0 ? (
-                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
-                        ) : (
-                          ibData.reconciliation.branch2Book.vouchers.map((v: any) => (
-                            <div key={v._id} className="py-1.5 flex justify-between">
-                              <span className="text-slate-600 font-mono">{v.dateStr} ({v.voucherType})</span>
-                              <span className="font-mono font-semibold">{v.primaryParty}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                      {formatCurrency(ibData.summary.missingInB2Amount)}
+                    </span>
                   </div>
                 </div>
-              </>
+
+                {/* Missing in B1 Card */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
+                  <div className="p-3 bg-purple-50 rounded-xl text-purple-600 shrink-0">
+                    <ArrowUpRight className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      बुक 1 में गायब (Missing in B1)
+                    </div>
+                    <div className="text-lg font-black text-purple-700 mt-0.5">
+                      {ibData.summary.missingInB1Count} Entries
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                      {formatCurrency(ibData.summary.missingInB1Amount)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Matched Count Card */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
+                  <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      पूर्ण मिलान (Matched)
+                    </div>
+                    <div className="text-lg font-black text-emerald-700 mt-0.5">
+                      {ibData.summary.matchedCount} Pairs
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                      {formatCurrency(ibData.summary.matchedAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Net Difference Card */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
+                  <div className="p-3 bg-slate-100 rounded-xl text-slate-700 shrink-0">
+                    <Scale className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      नेट अंतर (Net Diff)
+                    </div>
+                    <div className={`text-lg font-black mt-0.5 ${
+                      ibData.summary.isReconciled ? 'text-emerald-700' : 'text-rose-700'
+                    }`}>
+                      {formatCurrency(ibData.summary.difference)}
+                    </div>
+                    <span className={`text-[10px] font-bold block mt-0.5 ${
+                      ibData.summary.isReconciled ? 'text-emerald-600' : 'text-rose-600'
+                    }`}>
+                      {ibData.summary.isReconciled ? '✓ Fully Reconciled' : 'Discrepancy Exists'}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
             )}
+
+            {/* Filter and Mismatch Toggle Bar */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                
+                {/* Status Toggle: Default is 'mismatch_only' as requested! */}
+                <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                  <span className="text-slate-500 text-[11px] uppercase px-2">दृश्य मोड:</span>
+                  
+                  <button
+                    onClick={() => setIbStatusFilter('mismatch_only')}
+                    className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1.5 ${
+                      ibStatusFilter === 'mismatch_only'
+                        ? 'bg-rose-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    <FilterX className="w-3.5 h-3.5" />
+                    <span>केवल मिसमैच (Only Mismatches - मैच हटाकर)</span>
+                    {ibData?.summary?.totalMismatches > 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                        ibStatusFilter === 'mismatch_only' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {ibData.summary.totalMismatches}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setIbStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition ${
+                      ibStatusFilter === 'all'
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>सभी प्रविष्टियां (All {ibData?.filters?.totalAllRows || ''})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIbStatusFilter('matched_only')}
+                    className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1 ${
+                      ibStatusFilter === 'matched_only'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>केवल मैच हुई (Matched {ibData?.summary?.matchedCount || 0})</span>
+                  </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="वाउचर नं, तारीख या राशि खोजें..."
+                    value={ibSearch}
+                    onChange={(e) => setIbSearch(e.target.value)}
+                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                  />
+                  {ibSearch && (
+                    <button onClick={() => setIbSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Category Pills (Payment vs Sale vs Journal) */}
+              <div className="flex items-center space-x-2 pt-2 border-t border-slate-100 text-xs font-semibold overflow-x-auto">
+                <span className="text-slate-400 text-[11px] uppercase mr-1">श्रेणी (Category):</span>
+                
+                <button
+                  onClick={() => setIbTypeFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg transition ${
+                    ibTypeFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  सभी प्रकार (All)
+                </button>
+
+                <button
+                  onClick={() => setIbTypeFilter('payment_receipt')}
+                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 ${
+                    ibTypeFilter === 'payment_receipt' ? 'bg-blue-600 text-white font-bold' : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
+                  }`}
+                >
+                  <span>Payment ↔ Receipt (भुगतान व प्राप्ति)</span>
+                  {ibData?.summary?.categories?.paymentReceipt?.mismatchCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] px-1 py-0.2 rounded-full font-mono ml-1">
+                      {ibData.summary.categories.paymentReceipt.mismatchCount} Diff
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setIbTypeFilter('sale_purchase')}
+                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 ${
+                    ibTypeFilter === 'sale_purchase' ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  <span>Sale ↔ Purchase (बिक्री व खरीद)</span>
+                  {ibData?.summary?.categories?.salePurchase?.mismatchCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] px-1 py-0.2 rounded-full font-mono ml-1">
+                      {ibData.summary.categories.salePurchase.mismatchCount} Diff
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setIbTypeFilter('journal_other')}
+                  className={`px-2.5 py-1 rounded-lg transition ${
+                    ibTypeFilter === 'journal_other' ? 'bg-purple-600 text-white font-bold' : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+                  }`}
+                >
+                  <span>Journal व अन्य</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Side-by-Side Unified Line-by-Line Comparison Table */}
+            <div className="bg-white border-2 border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-5 py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+                <div className="font-bold text-xs tracking-wide flex items-center space-x-2">
+                  <GitCompare className="w-4 h-4 text-cyan-400" />
+                  <span>दो-तरफा वाउचर मिलान तालिका (Two-Way Reconciliation Table)</span>
+                </div>
+                <div className="text-xs text-slate-300 font-mono">
+                  दिखाई जा रही प्रविष्टियां: <b className="text-white">{ibData?.rows?.length || 0}</b>
+                  {ibStatusFilter === 'mismatch_only' && <span className="text-amber-300 ml-1.5">(केवल मिसमैच)</span>}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto max-h-[580px]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px] border-b-2 border-slate-300 sticky top-0 shadow-sm">
+                    <tr>
+                      <th className="px-3 py-3 text-center border-r border-slate-200">स्थिति (Status)</th>
+                      <th className="px-3 py-3 text-center border-r border-slate-200">Category</th>
+                      
+                      {/* Book 1 Header Block */}
+                      <th colSpan={4} className="px-4 py-3 bg-blue-100/70 text-blue-950 border-r-2 border-indigo-300 text-center font-black">
+                        बुक 1: {ibData?.selected?.branch1?.name || 'Branch 1'} [{ibData?.selected?.branch1?.code}]
+                      </th>
+
+                      {/* Book 2 Header Block */}
+                      <th colSpan={4} className="px-4 py-3 bg-purple-100/70 text-purple-950 border-r border-slate-300 text-center font-black">
+                        बुक 2: {ibData?.selected?.branch2?.name || 'Branch 2'} [{ibData?.selected?.branch2?.code}]
+                      </th>
+
+                      <th className="px-3 py-3 text-right bg-slate-200 text-slate-900 font-black">
+                        राशि (Amount)
+                      </th>
+                    </tr>
+                    <tr className="bg-slate-50 text-[10px] text-slate-600 border-b border-slate-200">
+                      <th className="px-3 py-2 text-center border-r border-slate-200">#</th>
+                      <th className="px-3 py-2 text-center border-r border-slate-200">Type</th>
+                      
+                      {/* B1 sub-columns */}
+                      <th className="px-3 py-2">तारीख व प्रकार</th>
+                      <th className="px-3 py-2">वाउचर नं</th>
+                      <th className="px-3 py-2 text-right bg-amber-50/50">डेबिट (नाम)</th>
+                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r-2 border-indigo-300">क्रेडिट (जमा)</th>
+
+                      {/* B2 sub-columns */}
+                      <th className="px-3 py-2">तारीख व प्रकार</th>
+                      <th className="px-3 py-2">वाउचर नं</th>
+                      <th className="px-3 py-2 text-right bg-amber-50/50">डेबिट (नाम)</th>
+                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r border-slate-300">क्रेडिट (जमा)</th>
+
+                      <th className="px-3 py-2 text-right">Net Value</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-200 font-medium text-xs">
+                    {ibLoading && (
+                      <tr>
+                        <td colSpan={11} className="py-16 text-center text-slate-400">
+                          <div className="w-8 h-8 border-3 border-cyan-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                          <span>दोनों किताबों का मिलान जांचा जा रहा है...</span>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!ibLoading && (!ibData?.rows || ibData.rows.length === 0) && (
+                      <tr>
+                        <td colSpan={11} className="py-16 text-center text-slate-400">
+                          <div className="max-w-sm mx-auto space-y-2">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                            <p className="font-bold text-slate-700 text-sm">
+                              {ibStatusFilter === 'mismatch_only' 
+                                ? 'बधाई! कोई मिसमैच प्रविष्टि नहीं पाई गई (0 Mismatches).'
+                                : 'No entries found matching criteria.'}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {ibStatusFilter === 'mismatch_only' && 'दोनों ब्रांचेस के सभी वाउचर्स पूर्ण रूप से मेल खाते हैं।'}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!ibLoading && ibData?.rows?.map((row: any, idx: number) => {
+                      const isMatched = row.matchStatus === 'MATCHED';
+                      const isMissingInB2 = row.matchStatus === 'MISSING_IN_B2';
+                      const isMissingInB1 = row.matchStatus === 'MISSING_IN_B1';
+
+                      return (
+                        <tr
+                          key={row.id || idx}
+                          className={`hover:bg-slate-50/80 transition ${
+                            isMatched
+                              ? 'bg-emerald-50/20'
+                              : isMissingInB2
+                              ? 'bg-amber-50/25'
+                              : 'bg-purple-50/25'
+                          }`}
+                        >
+                          {/* Match Status Badge */}
+                          <td className="px-3 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">
+                            {isMatched && (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <span>🟢</span>
+                                <span>MATCHED</span>
+                              </span>
+                            )}
+                            {isMissingInB2 && (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300" title="यह एंट्री बुक 1 में दर्ज है, पर बुक 2 में नहीं मिली">
+                                <span>🔴</span>
+                                <span>MISSING IN B2</span>
+                              </span>
+                            )}
+                            {isMissingInB1 && (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-300" title="यह एंट्री बुक 2 में दर्ज है, पर बुक 1 में नहीं मिली">
+                                <span>🔴</span>
+                                <span>MISSING IN B1</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Category */}
+                          <td className="px-3 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              row.category === 'PAYMENT_RECEIPT'
+                                ? 'bg-blue-100 text-blue-800'
+                                : row.category === 'SALE_PURCHASE'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-200 text-slate-800'
+                            }`}>
+                              {row.category === 'PAYMENT_RECEIPT' ? 'Pymt ↔ Rcpt' : row.category === 'SALE_PURCHASE' ? 'Sale ↔ Purc' : 'Jrnl / Other'}
+                            </span>
+                          </td>
+
+                          {/* Book 1 Side: Date & Voucher Type */}
+                          <td className="px-3 py-2.5 whitespace-nowrap font-mono text-slate-700">
+                            {row.b1 ? (
+                              <div>
+                                <span className="font-semibold">{row.b1.dateStr}</span>
+                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {row.b1.voucherType}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-rose-400 italic font-mono text-[11px]">- (बुक 1 में गायब) -</span>
+                            )}
+                          </td>
+
+                          {/* Book 1 Side: Voucher No */}
+                          <td className="px-3 py-2.5 whitespace-nowrap font-mono text-slate-600">
+                            {row.b1?.voucherNo || '-'}
+                          </td>
+
+                          {/* Book 1 Side: Debit */}
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20">
+                            {row.b1?.debit > 0 ? formatCurrency(row.b1.debit) : '-'}
+                          </td>
+
+                          {/* Book 1 Side: Credit */}
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r-2 border-indigo-300">
+                            {row.b1?.credit > 0 ? formatCurrency(row.b1.credit) : '-'}
+                          </td>
+
+                          {/* Book 2 Side: Date & Voucher Type */}
+                          <td className="px-3 py-2.5 whitespace-nowrap font-mono text-slate-700">
+                            {row.b2 ? (
+                              <div>
+                                <span className="font-semibold">{row.b2.dateStr}</span>
+                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {row.b2.voucherType}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-rose-400 italic font-mono text-[11px]">- (बुक 2 में गायब) -</span>
+                            )}
+                          </td>
+
+                          {/* Book 2 Side: Voucher No */}
+                          <td className="px-3 py-2.5 whitespace-nowrap font-mono text-slate-600">
+                            {row.b2?.voucherNo || '-'}
+                          </td>
+
+                          {/* Book 2 Side: Debit */}
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20">
+                            {row.b2?.debit > 0 ? formatCurrency(row.b2.debit) : '-'}
+                          </td>
+
+                          {/* Book 2 Side: Credit */}
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r border-slate-300">
+                            {row.b2?.credit > 0 ? formatCurrency(row.b2.credit) : '-'}
+                          </td>
+
+                          {/* Amount */}
+                          <td className="px-3 py-2.5 text-right whitespace-nowrap font-mono font-black text-slate-900 bg-slate-100/60">
+                            {formatCurrency(row.amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
           </div>
         )}
@@ -1827,10 +2767,29 @@ export default function Dashboard() {
               </div>
 
               <p className="text-xs text-slate-500 mb-6">
-                यूजर आवश्यकतानुसार किसी ब्रांच का डेटा, किसी कंपनी का डेटा या पूरा डेटाबेस रीसेट करके दोबारा नया डेटा अपलोड कर सकता है।
+                यूजर आवश्यकतानुसार केवल ट्रांजैक्शन डेटा वाइप कर सकता है ताकि उनके बनाए गए <b>एंटिटी कोड्स</b> और <b>लेजर ग्रुप्स</b> सुरक्षित रहें और नया डेटा अपलोड होते ही स्वतः लागू हो जाएं।
               </p>
 
               <div className="space-y-4">
+                {/* Preserve Rules Wipe Option */}
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <h4 className="font-extrabold text-indigo-950 text-sm">केवल ट्रांजैक्शन वाइप करें (Wipe Transactions Only - Safe Re-upload)</h4>
+                    </div>
+                    <p className="text-xs text-indigo-900/80 mt-0.5">
+                      सभी वाउचर्स हट जाएंगे, लेकिन आपके बनाए गए <b>लेजर ग्रुप्स</b> और <b>ब्रांच कोड मैपिंग्स</b> पूरी तरह सुरक्षित रहेंगे। अगली बार अपलोड पर वे अपने आप जुड़ जाएंगे!
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setResetModal({ open: true, type: 'transactions' as any, name: 'All Transactions (Rules Preserved)' })}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow transition whitespace-nowrap"
+                  >
+                    Wipe Transactions (Keep Rules)
+                  </button>
+                </div>
+
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-slate-800 text-sm">चयनित ब्रांच का डेटा हटाएं (Clear Branch Vouchers)</h4>
@@ -1885,15 +2844,20 @@ export default function Dashboard() {
 
       {/* ==================== MODALS ==================== */}
 
-      {/* 360 T-Format Party Ledger Modal */}
-      {selectedParty && selectedCompanyId && (
+      {/* 360 T-Format Party & Group Ledger Modal */}
+      {(selectedParty || selectedGroupModal) && selectedCompanyId && (
         <PartyLedgerModal
           partyName={selectedParty}
+          groupName={selectedGroupModal}
           companyId={selectedCompanyId}
-          onClose={() => setSelectedParty(null)}
+          onClose={() => {
+            setSelectedParty(null);
+            setSelectedGroupModal(null);
+          }}
           onVoucherIgnored={() => {
             fetchExceptions(selectedCompanyId);
             fetchMatrix(selectedCompanyId);
+            if (activeTab === 'interbranch') fetchInterBranch();
           }}
         />
       )}
@@ -2013,10 +2977,21 @@ export default function Dashboard() {
               <h3 className="text-base font-bold text-slate-900">डेटा डिलीट करने की पुष्टि (Confirm Delete)</h3>
             </div>
             
-            <p className="text-xs text-slate-600 mb-5">
-              क्या आप सुनिश्चित हैं कि आप <b>{resetModal.name || resetModal.type}</b> का डेटा स्थायी रूप से डिलीट करना चाहते हैं?
-              डिलीट होने के बाद आप कभी भी नया डेटा इम्पोर्ट कर सकते हैं।
-            </p>
+            <div className="text-xs text-slate-600 mb-5 space-y-1">
+              {resetModal.type === 'transactions' ? (
+                <>
+                  <p>क्या आप सभी वित्तीय वाउचर्स और बैलेंस वाइप करना चाहते हैं?</p>
+                  <p className="font-bold text-indigo-700">
+                    ✓ आपके बनाए गए लेजर ग्रुप्स और ब्रांच कोड्स सुरक्षित रहेंगे और नया DayBook अपलोड करने पर स्वतः पुनः लागू हो जाएंगे।
+                  </p>
+                </>
+              ) : (
+                <p>
+                  क्या आप सुनिश्चित हैं कि आप <b>{resetModal.name || resetModal.type}</b> का डेटा स्थायी रूप से डिलीट करना चाहते हैं?
+                  डिलीट होने के बाद आप कभी भी नया डेटा इम्पोर्ट कर सकते हैं।
+                </p>
+              )}
+            </div>
 
             <div className="flex items-center justify-end space-x-2">
               <button

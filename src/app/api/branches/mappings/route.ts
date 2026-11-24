@@ -30,8 +30,9 @@ export async function GET(req: NextRequest) {
     const mappings = await db.collection('branch_ledger_mappings').find({ companyId }).toArray();
     const mappingMap = new Map<string, any>();
     mappings.forEach(m => {
-      const key = `${m.branchId}_${m.partyName}`;
-      mappingMap.set(key, m);
+      mappingMap.set(`${m.branchId}_${m.partyName}`, m);
+      mappingMap.set(`all_${m.partyName}`, m);
+      mappingMap.set(m.partyName, m);
     });
 
     const branches = await db.collection('branches').find({ companyId }).toArray();
@@ -39,8 +40,9 @@ export async function GET(req: NextRequest) {
     branches.forEach(b => branchCodeMap.set(b._id.toString(), b.code));
 
     let items = balances.map(b => {
-      const key = `${b.branchId}_${b.partyName}`;
-      const mapping = mappingMap.get(key);
+      const mapping = mappingMap.get(`${b.branchId}_${b.partyName}`) ||
+                      mappingMap.get(`all_${b.partyName}`) ||
+                      mappingMap.get(b.partyName);
       const declaredCode = mapping?.targetBranchCode || b.mappedBranchCode || '';
 
       return {
@@ -124,7 +126,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     for (const name of names) {
       const filter: any = { companyId, partyName: name };
-      if (branchId) filter.branchId = branchId;
+      if (branchId && branchId !== 'all') filter.branchId = branchId;
 
       await db.collection('branch_ledger_mappings').updateMany(
         filter,
@@ -144,7 +146,7 @@ export async function POST(req: NextRequest) {
 
       // Update in party_balances
       const pbFilter: any = { companyId, partyName: name };
-      if (branchId) pbFilter.branchId = branchId;
+      if (branchId && branchId !== 'all') pbFilter.branchId = branchId;
 
       await db.collection('party_balances').updateMany(
         pbFilter,

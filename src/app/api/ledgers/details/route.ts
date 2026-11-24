@@ -7,20 +7,62 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('companyId');
-    const partyName = searchParams.get('partyName');
+    const partyName = searchParams.get('partyName') || '';
+    const groupNameParam = searchParams.get('groupName') || '';
+    const isGroupMode = searchParams.get('isGroupMode') === 'true' || !!groupNameParam;
     const branchFilter = searchParams.get('branchId') || 'all';
     const vTypeFilter = searchParams.get('voucherType') || 'all';
 
-    if (!companyId || !partyName) {
-      return NextResponse.json({ success: false, error: 'companyId and partyName are required' }, { status: 400 });
+    if (!companyId || (!partyName && !groupNameParam)) {
+      return NextResponse.json({ success: false, error: 'companyId and either partyName or groupName are required' }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();
 
-    // Query active (non-ignored) vouchers for this party in this company
+    // Check group membership
+    let effectiveGroupName = groupNameParam;
+    let targetAccounts: string[] = [];
+    let groupInfo: any = null;
+
+    if (groupNameParam) {
+      const gRecords = await db.collection('ledger_groups').find({ companyId, groupName: groupNameParam }).toArray();
+      targetAccounts = gRecords.map(g => g.partyName);
+      groupInfo = {
+        groupName: groupNameParam,
+        memberParties: targetAccounts,
+        isGroupView: true
+      };
+    } else if (partyName) {
+      const pRecord = await db.collection('ledger_groups').findOne({ companyId, partyName });
+      if (pRecord) {
+        effectiveGroupName = pRecord.groupName;
+        const allGroupMembers = await db.collection('ledger_groups').find({ companyId, groupName: pRecord.groupName }).toArray();
+        const memberNames = allGroupMembers.map(g => g.partyName);
+        groupInfo = {
+          groupName: pRecord.groupName,
+          memberParties: memberNames,
+          isGroupView: isGroupMode
+        };
+        if (isGroupMode) {
+          targetAccounts = memberNames;
+        } else {
+          targetAccounts = [partyName];
+        }
+      } else {
+        targetAccounts = [partyName];
+      }
+    }
+
+    if (targetAccounts.length === 0) {
+      targetAccounts = [partyName];
+    }
+
+    const targetAccountsSet = new Set(targetAccounts);
+
+    // Query active (non-ignored) vouchers for these accounts in this company
     const query: any = {
       companyId,
-      "lines.account": partyName,
+      "lines.account": { $in: targetAccounts },
       isIgnored: { $ne: true } // Exclude ignored entries from regular ledger
     };
     if (branchFilter && branchFilter !== 'all') {
@@ -34,10 +76,10 @@ export async function GET(req: NextRequest) {
     // Fetch active vouchers sorted by date asc
     const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
 
-    // Count ignored entries for this party
+    // Count ignored entries for these accounts
     const ignoredCount = await db.collection('vouchers').countDocuments({
       companyId,
-      "lines.account": partyName,
+      "lines.account": { $in: targetAccounts },
       isIgnored: true
     });
 
@@ -67,18 +109,28 @@ export async function GET(req: NextRequest) {
       totalCount: number;
     }>();
 
-    // Fetch all party balances for this party across all branches in company
-    const allPartyBalances = await db.collection('party_balances').find({ companyId, partyName }).toArray();
+    // Fetch all party balances for these target accounts across all branches in company
+    const allPartyBalances = await db.collection('party_balances').find({
+      companyId,
+      partyName: { $in: targetAccounts }
+    }).toArray();
+
     for (const pb of allPartyBalances) {
       const bName = branchNameMap.get(pb.branchId) || pb.branchName || 'Branch';
-      branchBreakdownMap.set(pb.branchId, {
-        branchId: pb.branchId,
-        branchName: bName,
-        totalDebit: pb.totalDebit || 0,
-        totalCredit: pb.totalCredit || 0,
-        voucherCounts: {},
-        totalCount: pb.voucherCount || 0
-      });
+      if (!branchBreakdownMap.has(pb.branchId)) {
+        branchBreakdownMap.set(pb.branchId, {
+          branchId: pb.branchId,
+          branchName: bName,
+          totalDebit: 0,
+          totalCredit: 0,
+          voucherCounts: {},
+          totalCount: 0
+        });
+      }
+      const bItem = branchBreakdownMap.get(pb.branchId)!;
+      bItem.totalDebit += (pb.totalDebit || 0);
+      bItem.totalCredit += (pb.totalCredit || 0);
+      bItem.totalCount += (pb.voucherCount || 0);
     }
 
     const transactions: any[] = [];
@@ -88,11 +140,15 @@ export async function GET(req: NextRequest) {
       let vDebit = 0;
       let vCredit = 0;
       const counterAccounts: string[] = [];
+      const matchedTargetAccounts: string[] = [];
 
       for (const line of v.lines) {
-        if (line.account === partyName) {
+        if (targetAccountsSet.has(line.account)) {
           vDebit += (line.debit || 0);
           vCredit += (line.credit || 0);
+          if (!matchedTargetAccounts.includes(line.account)) {
+            matchedTargetAccounts.push(line.account);
+          }
         } else {
           counterAccounts.push(line.account);
         }
@@ -128,6 +184,10 @@ export async function GET(req: NextRequest) {
       bStats.voucherCounts[vtKey] = (bStats.voucherCounts[vtKey] || 0) + 1;
 
       if (!vTypeFilter || vTypeFilter === 'all' || v.voucherType === vTypeFilter) {
+        const itemParticulars = targetAccounts.length > 1
+          ? `[${matchedTargetAccounts.join(', ')}] ${counterAccounts.length > 0 ? counterAccounts.slice(0, 2).join(', ') : (v.narration || '')}`
+          : (counterAccounts.length > 0 ? counterAccounts.slice(0, 3).join(', ') : (v.narration || partyName));
+
         transactions.push({
           id: v._id.toString(),
           date: v.date,
@@ -136,7 +196,8 @@ export async function GET(req: NextRequest) {
           voucherNo: v.voucherNo || '-',
           branchId: v.branchId,
           branchName: bName,
-          particulars: counterAccounts.length > 0 ? counterAccounts.slice(0, 3).join(', ') : (v.narration || partyName),
+          ledgerAccount: matchedTargetAccounts.join(', '),
+          particulars: itemParticulars,
           narration: v.narration || '',
           debit: vDebit,
           credit: vCredit,
@@ -151,6 +212,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       partyName,
+      displayName: targetAccounts.length > 1 ? (groupInfo?.groupName ? `[GROUP] ${groupInfo.groupName}` : partyName) : partyName,
+      isGroupView: targetAccounts.length > 1,
+      targetAccounts,
+      groupInfo,
       branchFilter,
       ignoredCount,
       summary: {
