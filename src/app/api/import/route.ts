@@ -7,6 +7,36 @@ import path from 'path';
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
 
+function decodeUploadedBuffer(buffer: ArrayBuffer | Buffer): string {
+  const bytes = buffer instanceof Buffer ? new Uint8Array(buffer) : new Uint8Array(buffer);
+  if (bytes.length === 0) return '';
+
+  // 1. UTF-8 with BOM (0xEF, 0xBB, 0xBF)
+  if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return new TextDecoder('utf-8').decode(bytes.slice(3));
+  }
+  // 2. UTF-16 LE (0xFF, 0xFE)
+  if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    return new TextDecoder('utf-16le').decode(bytes.slice(2));
+  }
+  // 3. UTF-16 BE (0xFE, 0xFF)
+  if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    return new TextDecoder('utf-16be').decode(bytes.slice(2));
+  }
+  // 4. UTF-16 LE without BOM (common in Windows Notepad when null bytes alternate)
+  if (bytes.length >= 4 && bytes[1] === 0x00 && bytes[3] === 0x00) {
+    return new TextDecoder('utf-16le').decode(bytes);
+  }
+
+  // 5. Try UTF-8 (strict)
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    // 6. Fallback to latin1 / windows-1252
+    return new TextDecoder('latin1').decode(bytes);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || '';
@@ -29,7 +59,8 @@ export async function POST(req: NextRequest) {
         if (!fs.existsSync(samplePath)) {
           return NextResponse.json({ success: false, error: 'DayBook file not found on server' }, { status: 404 });
         }
-        fileContent = fs.readFileSync(samplePath, 'latin1');
+        const rawBuf = fs.readFileSync(samplePath);
+        fileContent = decodeUploadedBuffer(rawBuf);
       } else if (body.fileContent) {
         fileContent = body.fileContent;
       }
@@ -44,8 +75,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
       }
       const buffer = await file.arrayBuffer();
-      const decoder = new TextDecoder('latin1');
-      fileContent = decoder.decode(buffer);
+      fileContent = decodeUploadedBuffer(buffer);
     }
 
     if (!companyId || !branchId) {
@@ -66,12 +96,16 @@ export async function POST(req: NextRequest) {
     const companyName = company?.name || 'Company';
     const branchName = branch?.name || 'Branch';
 
-    // Parse DayBook content with exact single-entry rules
+    // Parse DayBook content with exact double-entry rules
     const parseResult = parseDayBookContent(fileContent);
-    const { vouchers, totalDebits, totalCredits } = parseResult;
+    const { vouchers, totalDebits, totalCredits, delimiter } = parseResult;
 
     if (vouchers.length === 0) {
-      return NextResponse.json({ success: false, error: 'No valid vouchers found in the uploaded file' }, { status: 400 });
+      const sampleLines = fileContent.split(/\r?\n|\r/).filter(l => l.trim().length > 0).slice(0, 3).join(' | ');
+      return NextResponse.json({
+        success: false,
+        error: `फ़ाइल में कोई मान्य वाउचर नहीं मिला (No valid vouchers found). कृपया सुनिश्चित करें कि फ़ाइल Tally DayBook CSV/TXT फॉर्मेट में है। (प्रारंभिक पंक्तियाँ: ${sampleLines.slice(0, 90)}...)`
+      }, { status: 400 });
     }
 
     // Clear existing vouchers/balances for this branch if requested
@@ -202,9 +236,18 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    for (let i = 0; i < partyDocs.length; i += chunkSize) {
-      const chunk = partyDocs.slice(i, i + chunkSize);
-      await db.collection('party_balances').insertMany(chunk, { ordered: false });
+    // Bulk upsert party balances to safely avoid duplicate key errors
+    const bulkOps = partyDocs.map(doc => ({
+      updateOne: {
+        filter: { companyId: doc.companyId, branchId: doc.branchId, partyName: doc.partyName },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    for (let i = 0; i < bulkOps.length; i += chunkSize) {
+      const chunk = bulkOps.slice(i, i + chunkSize);
+      await db.collection('party_balances').bulkWrite(chunk, { ordered: false });
     }
 
     return NextResponse.json({
