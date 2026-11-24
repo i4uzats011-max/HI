@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('companyId');
     const partyName = searchParams.get('partyName');
-    const branchFilter = searchParams.get('branchId') || 'all'; // 'all' or specific branchId
+    const branchFilter = searchParams.get('branchId') || 'all';
     const vTypeFilter = searchParams.get('voucherType') || 'all';
 
     if (!companyId || !partyName) {
@@ -17,24 +17,30 @@ export async function GET(req: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Query vouchers for this party in this company
+    // Query active (non-ignored) vouchers for this party in this company
     const query: any = {
       companyId,
-      "lines.account": partyName
+      "lines.account": partyName,
+      isIgnored: { $ne: true } // Exclude ignored entries from regular ledger
     };
     if (branchFilter && branchFilter !== 'all') {
       query.branchId = branchFilter;
     }
 
-    // Also get all branches for metadata
     const branches = await db.collection('branches').find({ companyId }).toArray();
     const branchNameMap = new Map<string, string>();
     branches.forEach(b => branchNameMap.set(b._id.toString(), b.name));
 
-    // Fetch matching vouchers sorted by date asc
+    // Fetch active vouchers sorted by date asc
     const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
 
-    // Summary counters
+    // Count ignored entries for this party
+    const ignoredCount = await db.collection('vouchers').countDocuments({
+      companyId,
+      "lines.account": partyName,
+      isIgnored: true
+    });
+
     let totalDebit = 0;
     let totalCredit = 0;
 
@@ -94,7 +100,7 @@ export async function GET(req: NextRequest) {
 
       totalDebit += vDebit;
       totalCredit += vCredit;
-      // In Tally: Debit increases party receivable (+), Credit decreases party receivable (-)
+      // Debit increases party receivable (+), Credit decreases (-)
       runningBalance += (vDebit - vCredit);
 
       let vtKey = v.voucherType || 'Other';
@@ -121,7 +127,6 @@ export async function GET(req: NextRequest) {
       const bStats = branchBreakdownMap.get(bId)!;
       bStats.voucherCounts[vtKey] = (bStats.voucherCounts[vtKey] || 0) + 1;
 
-      // Filter by voucher type if requested
       if (!vTypeFilter || vTypeFilter === 'all' || v.voucherType === vTypeFilter) {
         transactions.push({
           id: v._id.toString(),
@@ -135,7 +140,6 @@ export async function GET(req: NextRequest) {
           narration: v.narration || '',
           debit: vDebit,
           credit: vCredit,
-          amount: vCredit > 0 ? vCredit : -vDebit,
           runningBalance: Math.round(runningBalance * 100) / 100,
           balanceType: runningBalance > 0.01 ? 'Dr' : (runningBalance < -0.01 ? 'Cr' : 'Nil')
         });
@@ -148,6 +152,7 @@ export async function GET(req: NextRequest) {
       success: true,
       partyName,
       branchFilter,
+      ignoredCount,
       summary: {
         totalDebit: Math.round(totalDebit * 100) / 100,
         totalCredit: Math.round(totalCredit * 100) / 100,

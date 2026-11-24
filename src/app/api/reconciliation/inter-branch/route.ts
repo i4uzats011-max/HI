@@ -16,9 +16,6 @@ export async function GET(req: NextRequest) {
 
     const { db } = await connectToDatabase();
     const branches = await db.collection('branches').find({ companyId }).toArray();
-
-    // Auto-detect inter-branch candidate accounts
-    // Look for accounts in branch 1 that match branch 2 name/code, or vice-versa
     const branchMap = new Map<string, any>();
     branches.forEach(b => branchMap.set(b._id.toString(), b));
 
@@ -35,30 +32,53 @@ export async function GET(req: NextRequest) {
 
     const b1Id = b1._id.toString();
     const b2Id = b2._id.toString();
+    const b1Code = (b1.code || '').toUpperCase();
+    const b2Code = (b2.code || '').toUpperCase();
 
-    // Find all ledger accounts in b1 and b2
+    // Fetch mappings from branch_ledger_mappings
+    const mappings = await db.collection('branch_ledger_mappings').find({ companyId }).toArray();
+    const b1MappedToB2 = mappings.filter(m =>
+      m.branchId === b1Id && (m.targetBranchId === b2Id || (b2Code && m.targetBranchCode === b2Code))
+    );
+    const b2MappedToB1 = mappings.filter(m =>
+      m.branchId === b2Id && (m.targetBranchId === b1Id || (b1Code && m.targetBranchCode === b1Code))
+    );
+
+    const b1MappedNames = new Set(b1MappedToB2.map(m => m.partyName));
+    const b2MappedNames = new Set(b2MappedToB1.map(m => m.partyName));
+
+    // Fetch all accounts in both branches
     const [b1Accounts, b2Accounts] = await Promise.all([
       db.collection('party_balances').find({ branchId: b1Id }).toArray(),
       db.collection('party_balances').find({ branchId: b2Id }).toArray()
     ]);
 
-    // Find accounts in B1 that mention B2's name or code or "Branch" or "HO" or "Inter"
-    const b2Keywords = [b2.name.toLowerCase(), b2.code.toLowerCase(), 'inter branch', 'branch transfer'];
-    const b1Keywords = [b1.name.toLowerCase(), b1.code.toLowerCase(), 'inter branch', 'branch transfer'];
+    // Accounts in B1 matching B2: Either explicitly mapped with code, or auto-detected by name/code
+    const b2Keywords = [b2.name.toLowerCase(), b2Code.toLowerCase(), 'inter branch', 'branch transfer'].filter(Boolean);
+    const b1Keywords = [b1.name.toLowerCase(), b1Code.toLowerCase(), 'inter branch', 'branch transfer'].filter(Boolean);
 
-    const matchedInB1 = b1Accounts.filter(a => b2Keywords.some(kw => kw && a.partyName.toLowerCase().includes(kw)));
-    const matchedInB2 = b2Accounts.filter(a => b1Keywords.some(kw => kw && a.partyName.toLowerCase().includes(kw)));
+    const matchedInB1 = b1Accounts.filter(a =>
+      b1MappedNames.has(a.partyName) ||
+      (a.mappedBranchCode && a.mappedBranchCode === b2Code) ||
+      (b1MappedNames.size === 0 && b2Keywords.some(kw => a.partyName.toLowerCase().includes(kw)))
+    );
 
-    // Fetch transactions in B1 for these accounts
-    const b1AccountNames = matchedInB1.map(a => a.partyName);
-    const b2AccountNames = matchedInB2.map(a => a.partyName);
+    const matchedInB2 = b2Accounts.filter(a =>
+      b2MappedNames.has(a.partyName) ||
+      (a.mappedBranchCode && a.mappedBranchCode === b1Code) ||
+      (b2MappedNames.size === 0 && b1Keywords.some(kw => a.partyName.toLowerCase().includes(kw)))
+    );
+
+    // Fetch transactions in B1 and B2 for these accounts
+    const b1NamesList = matchedInB1.map(a => a.partyName);
+    const b2NamesList = matchedInB2.map(a => a.partyName);
 
     const [b1Vouchers, b2Vouchers] = await Promise.all([
-      b1AccountNames.length > 0
-        ? db.collection('vouchers').find({ branchId: b1Id, "lines.account": { $in: b1AccountNames } }).sort({ date: 1 }).toArray()
+      b1NamesList.length > 0
+        ? db.collection('vouchers').find({ branchId: b1Id, "lines.account": { $in: b1NamesList } }).sort({ date: 1 }).toArray()
         : [],
-      b2AccountNames.length > 0
-        ? db.collection('vouchers').find({ branchId: b2Id, "lines.account": { $in: b2AccountNames } }).sort({ date: 1 }).toArray()
+      b2NamesList.length > 0
+        ? db.collection('vouchers').find({ branchId: b2Id, "lines.account": { $in: b2NamesList } }).sort({ date: 1 }).toArray()
         : []
     ]);
 
@@ -72,7 +92,7 @@ export async function GET(req: NextRequest) {
     const b2Net = b2TotalDebit - b2TotalCredit; // Net in B2's books
 
     // In double entry, if B1 shows Debit X for B2, then B2 should show Credit X for B1!
-    // So reconciliation difference = |b1Net - (-b2Net)| = |b1Net + b2Net|
+    // Difference = |b1Net - (-b2Net)| = |b1Net + b2Net|
     const difference = Math.abs(Math.round((b1Net + b2Net) * 100) / 100);
     const isReconciled = difference < 1.0;
 
@@ -86,7 +106,13 @@ export async function GET(req: NextRequest) {
       reconciliation: {
         branch1Book: {
           branchName: b1.name,
-          matchedAccounts: matchedInB1.map(a => ({ name: a.partyName, net: a.netBalance, status: a.status })),
+          branchCode: b1.code,
+          matchedAccounts: matchedInB1.map(a => ({
+            name: a.partyName,
+            net: a.netBalance,
+            status: a.status,
+            isExplicitlyMapped: b1MappedNames.has(a.partyName)
+          })),
           totalDebit: Math.round(b1TotalDebit * 100) / 100,
           totalCredit: Math.round(b1TotalCredit * 100) / 100,
           netBalance: Math.round(b1Net * 100) / 100,
@@ -96,7 +122,13 @@ export async function GET(req: NextRequest) {
         },
         branch2Book: {
           branchName: b2.name,
-          matchedAccounts: matchedInB2.map(a => ({ name: a.partyName, net: a.netBalance, status: a.status })),
+          branchCode: b2.code,
+          matchedAccounts: matchedInB2.map(a => ({
+            name: a.partyName,
+            net: a.netBalance,
+            status: a.status,
+            isExplicitlyMapped: b2MappedNames.has(a.partyName)
+          })),
           totalDebit: Math.round(b2TotalDebit * 100) / 100,
           totalCredit: Math.round(b2TotalCredit * 100) / 100,
           netBalance: Math.round(b2Net * 100) / 100,

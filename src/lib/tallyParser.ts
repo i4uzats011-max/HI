@@ -75,7 +75,6 @@ function extractFinancialAmount(cols: string[], startIndex: number): number | nu
   for (let c = startIndex; c < cols.length; c++) {
     const rawVal = cols[c];
     if (!rawVal) continue;
-    // Skip currency symbols, exchange rates, and inventory units
     const lower = rawVal.toLowerCase();
     if (
       lower.includes('$') ||
@@ -109,6 +108,22 @@ export function parseDayBookContent(content: string): ParseResult {
 
   const datePattern = /^\d{1,2}-[A-Za-z]{3}-\d{2,4}$/;
 
+  const finalizeVoucher = (v: ParsedVoucher) => {
+    if (!v || v.lines.length === 0) return;
+    const vDr = v.lines.reduce((s, l) => s + l.debit, 0);
+    const vCr = v.lines.reduce((s, l) => s + l.credit, 0);
+
+    // Strict Double-Entry Rule: Debit == Credit (Sum of Plus and Minus == 0)
+    if (Math.abs(vDr - vCr) < 0.05 && vDr > 0) {
+      vouchers.push(v);
+      for (const line of v.lines) {
+        if (line.account) accountsSet.add(line.account);
+      }
+      totalDebits += vDr;
+      totalCredits += vCr;
+    }
+  };
+
   for (let i = 0; i < rawLines.length; i++) {
     const rawLine = rawLines[i].trim();
     if (!rawLine) continue;
@@ -120,9 +135,8 @@ export function parseDayBookContent(content: string): ParseResult {
     const isNewEntry = datePattern.test(col0) || /^\d{4}-\d{2}-\d{2}$/.test(col0);
 
     if (isNewEntry) {
-      // Finalize previous voucher
-      if (currentVoucher && currentVoucher.lines.length > 0) {
-        vouchers.push(currentVoucher);
+      if (currentVoucher) {
+        finalizeVoucher(currentVoucher);
       }
 
       const dateStr = col0;
@@ -140,10 +154,8 @@ export function parseDayBookContent(content: string): ParseResult {
         narration: ''
       };
 
-      // Find amount for first ledger line (searched in cols >= 4)
+      // Header line amount
       const amount = extractFinancialAmount(cols, 4);
-
-      // "हर लेजर के साथ अमाउंट आना जरूरी है, बिना अमाउंट के लेजर नहीं मिलेगा"
       if (ledgerName && amount !== null) {
         const debit = amount < 0 ? Math.abs(amount) : 0;
         const credit = amount > 0 ? amount : 0;
@@ -154,12 +166,8 @@ export function parseDayBookContent(content: string): ParseResult {
           credit,
           isHeader: true
         });
-        accountsSet.add(ledgerName);
-        totalDebits += debit;
-        totalCredits += credit;
       }
     } else if (currentVoucher) {
-      // Continuation lines for this same entry
       // Check for Voucher/Receipt Number
       if (rawLine.startsWith('(No. :') || col0.startsWith('(No. :')) {
         const raw = rawLine.startsWith('(No. :') ? rawLine : col0;
@@ -173,10 +181,8 @@ export function parseDayBookContent(content: string): ParseResult {
         !col0.toLowerCase().includes('kgs')
       ) {
         const ledgerName = col0;
-        // Search amount in cols >= 1
         const amount = extractFinancialAmount(cols, 1);
 
-        // "हर लेजर के साथ अमाउंट आना जरूरी है, बिना अमाउंट के लेजर नहीं मिलेगा"
         if (amount !== null) {
           const debit = amount < 0 ? Math.abs(amount) : 0;
           const credit = amount > 0 ? amount : 0;
@@ -187,24 +193,14 @@ export function parseDayBookContent(content: string): ParseResult {
             credit,
             isHeader: false
           });
-          accountsSet.add(ledgerName);
-          totalDebits += debit;
-          totalCredits += credit;
-        } else {
-          // If no amount, could be narration / remarks
-          if (!currentVoucher.narration) {
-            currentVoucher.narration = ledgerName;
-          } else {
-            currentVoucher.narration += ' | ' + ledgerName;
-          }
         }
       }
     }
   }
 
   // Push final voucher
-  if (currentVoucher && currentVoucher.lines.length > 0) {
-    vouchers.push(currentVoucher);
+  if (currentVoucher) {
+    finalizeVoucher(currentVoucher);
   }
 
   return {

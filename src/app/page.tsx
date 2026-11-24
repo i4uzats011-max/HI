@@ -24,14 +24,19 @@ import {
   Scale,
   Sparkles,
   Zap,
-  Check,
-  FolderOpen
+  Tag,
+  CheckSquare,
+  Square,
+  Globe2,
+  Ban,
+  RotateCcw,
+  ShieldAlert
 } from 'lucide-react';
 import PartyLedgerModal from '@/components/PartyLedgerModal';
 
 export default function Dashboard() {
-  // Navigation
-  const [activeTab, setActiveTab] = useState<'matrix' | 'branches' | 'interbranch' | 'reset'>('matrix');
+  // Navigation tabs: added 'exceptions' tab
+  const [activeTab, setActiveTab] = useState<'matrix' | 'declare' | 'interbranch' | 'exceptions' | 'branches' | 'reset'>('matrix');
 
   // Company State
   const [companies, setCompanies] = useState<any[]>([]);
@@ -63,11 +68,26 @@ export default function Dashboard() {
   // 360 Party Ledger Modal State
   const [selectedParty, setSelectedParty] = useState<string | null>(null);
 
+  // Branch Ledger Declaration State (Declare Ledgers as Branch with Code)
+  const [declareLedgers, setDeclareLedgers] = useState<any[]>([]);
+  const [declareLoading, setDeclareLoading] = useState<boolean>(false);
+  const [declareSearch, setDeclareSearch] = useState<string>('');
+  const [declareSelectedNames, setDeclareSelectedNames] = useState<string[]>([]);
+  const [assignBranchCode, setAssignBranchCode] = useState<string>('');
+  const [declaredOnlyFilter, setDeclaredOnlyFilter] = useState<boolean>(false);
+  const [availableDeclaredCodes, setAvailableDeclaredCodes] = useState<string[]>([]);
+
   // Inter-Branch State
   const [ibBranch1, setIbBranch1] = useState<string>('');
   const [ibBranch2, setIbBranch2] = useState<string>('');
   const [ibData, setIbData] = useState<any>(null);
   const [ibLoading, setIbLoading] = useState<boolean>(false);
+
+  // Exceptions Report State
+  const [exceptions, setExceptions] = useState<any[]>([]);
+  const [exceptionsLoading, setExceptionsLoading] = useState<boolean>(false);
+  const [exceptionsSearch, setExceptionsSearch] = useState<string>('');
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   // Reset State
   const [resetModal, setResetModal] = useState<{ open: boolean; type: 'branch' | 'company' | 'all'; id?: string; name?: string }>({
@@ -84,7 +104,6 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Fetch Companies on Load
   useEffect(() => {
     fetchCompanies();
   }, []);
@@ -96,7 +115,6 @@ export default function Dashboard() {
       if (json.success) {
         setCompanies(json.companies || []);
         if (json.companies && json.companies.length > 0) {
-          // If no active company, select first
           if (!selectedCompanyId) {
             setSelectedCompanyId(json.companies[0].id);
             setSelectedCompany(json.companies[0]);
@@ -111,13 +129,14 @@ export default function Dashboard() {
     }
   }
 
-  // When selectedCompanyId changes, refresh branches & matrix
   useEffect(() => {
     if (!selectedCompanyId) return;
     const current = companies.find(c => c.id === selectedCompanyId);
     setSelectedCompany(current);
     fetchBranches(selectedCompanyId);
     fetchMatrix(selectedCompanyId);
+    fetchDeclaredLedgers(selectedCompanyId);
+    fetchExceptions(selectedCompanyId);
   }, [selectedCompanyId, companies]);
 
   async function fetchBranches(companyId: string) {
@@ -152,15 +171,161 @@ export default function Dashboard() {
     }
   }
 
-  // Handle Search in Matrix
+  // Fetch Ledgers for Branch Declaration
+  async function fetchDeclaredLedgers(companyId: string, search = declareSearch, declaredOnly = declaredOnlyFilter) {
+    setDeclareLoading(true);
+    try {
+      let url = `/api/branches/mappings?companyId=${companyId}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (declaredOnly) url += `&declaredOnly=true`;
+
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.success) {
+        setDeclareLedgers(json.ledgers || []);
+        setAvailableDeclaredCodes(json.declaredCodes || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeclareLoading(false);
+    }
+  }
+
+  // Fetch Exceptions (Ignored Entries)
+  async function fetchExceptions(companyId: string, search = exceptionsSearch) {
+    setExceptionsLoading(true);
+    try {
+      let url = `/api/exceptions?companyId=${companyId}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.success) {
+        setExceptions(json.exceptions || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setExceptionsLoading(false);
+    }
+  }
+
+  // Restore Ignored Entry back to Ledger
+  async function handleRestoreEntry(voucherId: string) {
+    setRestoringId(voucherId);
+    try {
+      const res = await fetch('/api/vouchers/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voucherId,
+          isIgnored: false
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('एंट्री को वापस लेजर में शामिल कर दिया गया!');
+        await fetchExceptions(selectedCompanyId);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Failed to restore', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
   useEffect(() => {
-    if (selectedCompanyId) {
+    if (selectedCompanyId && activeTab === 'declare') {
       const timer = setTimeout(() => {
-        fetchMatrix(selectedCompanyId, matrixSearch, matrixFilter);
+        fetchDeclaredLedgers(selectedCompanyId, declareSearch, declaredOnlyFilter);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [matrixSearch, matrixFilter]);
+  }, [declareSearch, declaredOnlyFilter, activeTab]);
+
+  useEffect(() => {
+    if (selectedCompanyId && activeTab === 'exceptions') {
+      const timer = setTimeout(() => {
+        fetchExceptions(selectedCompanyId, exceptionsSearch);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [exceptionsSearch, activeTab]);
+
+  // Handle Branch Code Assignment / Declaration
+  async function handleAssignBranchCode() {
+    if (!selectedCompanyId || !assignBranchCode.trim()) {
+      showToast('कृपया पहले ब्रांच कोड दर्ज करें', 'error');
+      return;
+    }
+    if (declareSelectedNames.length === 0) {
+      showToast('कृपया कम से कम एक लेजर चुनें', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/branches/mappings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: selectedCompanyId,
+          partyNames: declareSelectedNames,
+          branchCode: assignBranchCode.trim().toUpperCase()
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        setDeclareSelectedNames([]);
+        setAssignBranchCode('');
+        await fetchDeclaredLedgers(selectedCompanyId, declareSearch, declaredOnlyFilter);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Error declaring branch', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Remove Branch Declaration
+  async function handleRemoveDeclaration(partyName: string) {
+    if (!selectedCompanyId || !partyName) return;
+    try {
+      const res = await fetch(`/api/branches/mappings?companyId=${selectedCompanyId}&partyName=${encodeURIComponent(partyName)}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        await fetchDeclaredLedgers(selectedCompanyId, declareSearch, declaredOnlyFilter);
+        await fetchMatrix(selectedCompanyId);
+      } else {
+        showToast(json.error || 'Error removing declaration', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function toggleSelectAllDeclare() {
+    if (declareSelectedNames.length === declareLedgers.length) {
+      setDeclareSelectedNames([]);
+    } else {
+      setDeclareSelectedNames(declareLedgers.map(l => l.partyName));
+    }
+  }
+
+  function toggleSelectDeclare(partyName: string) {
+    if (declareSelectedNames.includes(partyName)) {
+      setDeclareSelectedNames(declareSelectedNames.filter(n => n !== partyName));
+    } else {
+      setDeclareSelectedNames([...declareSelectedNames, partyName]);
+    }
+  }
 
   // Create Company
   async function handleCreateCompany(e: React.FormEvent) {
@@ -213,7 +378,7 @@ export default function Dashboard() {
     }
   }
 
-  // Import Handler (File or 1-Click Sample)
+  // Import Handler
   async function handleImport(useSample = false) {
     if (!selectedCompanyId || !importBranchId) {
       showToast('कृपया पहले कंपनी और ब्रांच चुनें', 'error');
@@ -258,9 +423,9 @@ export default function Dashboard() {
       if (json.success) {
         setImportResult(json.summary);
         showToast(`इम्पोर्ट सफल! ${json.summary.totalVouchers} वाउचर्स MongoDB में सेव हो गए।`);
-        // Refresh branches & matrix
         await fetchBranches(selectedCompanyId);
         await fetchMatrix(selectedCompanyId);
+        await fetchExceptions(selectedCompanyId);
       } else {
         showToast(json.error || 'Import failed', 'error');
       }
@@ -320,9 +485,11 @@ export default function Dashboard() {
           setSelectedCompanyId('');
           setMatrixData(null);
           setBranches([]);
+          setExceptions([]);
         } else {
           await fetchBranches(selectedCompanyId);
           await fetchMatrix(selectedCompanyId);
+          await fetchExceptions(selectedCompanyId);
         }
       } else {
         showToast(json.error || 'Reset failed', 'error');
@@ -354,7 +521,6 @@ export default function Dashboard() {
       <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
-          {/* Logo & Title */}
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <Scale className="w-5 h-5 text-white" />
@@ -366,20 +532,17 @@ export default function Dashboard() {
                   Multi-Branch
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Ledger Reconciliation & DayBook Matching System</p>
+              <p className="text-xs text-slate-400">T-Format Ledger & DayBook Reconciliation System</p>
             </div>
           </div>
 
-          {/* Company Selector & Actions */}
           <div className="flex items-center space-x-3">
-            {/* Database indicator */}
             <div className="hidden md:flex items-center space-x-1.5 px-3 py-1 bg-slate-800/80 rounded-lg border border-slate-700/60 text-xs text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <Database className="w-3.5 h-3.5 text-slate-400" />
               <span>MongoDB: focustube</span>
             </div>
 
-            {/* Select Company */}
             <div className="flex items-center space-x-2 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1">
               <Building className="w-4 h-4 text-indigo-400" />
               <select
@@ -399,7 +562,6 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {/* New Company Button */}
             <button
               onClick={() => setShowNewCompanyModal(true)}
               className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow transition"
@@ -409,7 +571,6 @@ export default function Dashboard() {
               <span className="hidden sm:inline">New Company</span>
             </button>
 
-            {/* Wipe / Reset Data */}
             <button
               onClick={() => setResetModal({ open: true, type: 'company', name: selectedCompany?.name })}
               className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
@@ -431,24 +592,19 @@ export default function Dashboard() {
             }`}
           >
             <Scale className="w-4 h-4" />
-            <span>पार्टी रिकंसीलेशन मैट्रिक्स (Party Reconciliation Matrix)</span>
+            <span>पार्टी मैट्रिक्स (Party Matrix)</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('branches')}
+            onClick={() => setActiveTab('declare')}
             className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
-              activeTab === 'branches'
+              activeTab === 'declare'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Building2 className="w-4 h-4" />
-            <span>ब्रांचेस व इम्पोर्ट (Branches & DayBook Import)</span>
-            {branches.length > 0 && (
-              <span className="bg-indigo-500/20 text-indigo-300 text-[10px] px-1.5 py-0.2 rounded-full">
-                {branches.length}
-              </span>
-            )}
+            <Tag className="w-4 h-4 text-purple-400" />
+            <span>लेजर को ब्रांच कोड दें (Declare Branch by Code)</span>
           </button>
 
           <button
@@ -460,7 +616,42 @@ export default function Dashboard() {
             }`}
           >
             <ArrowRightLeft className="w-4 h-4" />
-            <span>आपसी ब्रांच मिलान (Inter-Branch Reconciliation)</span>
+            <span>आपसी ब्रांच मिलान (Inter-Branch Matching)</span>
+          </button>
+
+          {/* New Tab: Exceptions Report */}
+          <button
+            onClick={() => setActiveTab('exceptions')}
+            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+              activeTab === 'exceptions'
+                ? 'border-rose-500 text-rose-400 bg-slate-800/40'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>एक्सेप्शंस रिपोर्ट (Exceptions Report)</span>
+            {exceptions.length > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold font-mono">
+                {exceptions.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('branches')}
+            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+              activeTab === 'branches'
+                ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>ब्रांचेस व इम्पोर्ट (Branches & Import)</span>
+            {branches.length > 0 && (
+              <span className="bg-indigo-500/20 text-indigo-300 text-[10px] px-1.5 py-0.2 rounded-full">
+                {branches.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -472,7 +663,7 @@ export default function Dashboard() {
             }`}
           >
             <Trash2 className="w-4 h-4" />
-            <span>डेटा रीसेट (Reset & Clear Data)</span>
+            <span>डेटा रीसेट (Reset & Clear)</span>
           </button>
         </div>
       </header>
@@ -480,7 +671,6 @@ export default function Dashboard() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        {/* If no company created yet */}
         {companies.length === 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm max-w-lg mx-auto mt-10">
             <Building2 className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
@@ -502,7 +692,6 @@ export default function Dashboard() {
         {companies.length > 0 && activeTab === 'matrix' && (
           <div className="space-y-6">
             
-            {/* KPI Cards Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
                 <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
@@ -570,10 +759,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Matrix Filter & Action Bar */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-              
-              {/* Search input */}
               <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
                 <Search className="w-4 h-4 text-slate-400" />
                 <input
@@ -590,7 +776,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Filter Pills */}
               <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                 <button
                   onClick={() => setMatrixFilter('all')}
@@ -626,7 +811,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => fetchMatrix(selectedCompanyId)}
@@ -656,7 +840,6 @@ export default function Dashboard() {
                     <tr>
                       <th className="px-5 py-3.5">पार्टी का नाम (Party / Ledger Name)</th>
                       
-                      {/* Dynamic Branch Columns */}
                       {matrixData?.branches?.map((b: any) => (
                         <th key={b.id} className="px-4 py-3.5 text-right whitespace-nowrap">
                           <span className="text-slate-900">{b.name}</span>
@@ -686,14 +869,6 @@ export default function Dashboard() {
                         <td colSpan={6 + (matrixData?.branches?.length || 0)} className="py-12 text-center text-slate-400">
                           <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                           <p className="font-semibold text-slate-600">No party ledger entries found</p>
-                          <p className="text-xs text-slate-400 mt-1">Please import DayBook files for branches first</p>
-                          <button
-                            onClick={() => setActiveTab('branches')}
-                            className="mt-3 inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold"
-                          >
-                            <UploadCloud className="w-3.5 h-3.5" />
-                            <span>Go to DayBook Import</span>
-                          </button>
                         </td>
                       </tr>
                     )}
@@ -704,7 +879,6 @@ export default function Dashboard() {
                         onClick={() => setSelectedParty(p.partyName)}
                         className="hover:bg-indigo-50/40 cursor-pointer transition"
                       >
-                        {/* Party Name */}
                         <td className="px-5 py-3 text-slate-900 font-semibold max-w-xs">
                           <div className="flex items-center space-x-2">
                             <span className="truncate">{p.partyName}</span>
@@ -716,7 +890,6 @@ export default function Dashboard() {
                           </div>
                         </td>
 
-                        {/* Branch Balance Columns */}
                         {matrixData?.branches?.map((b: any) => {
                           const bInfo = p.branchBalances[b.id];
                           if (!bInfo || bInfo.net === 0) {
@@ -742,17 +915,14 @@ export default function Dashboard() {
                           );
                         })}
 
-                        {/* Consolidated Debit */}
                         <td className="px-4 py-3 text-right text-slate-600 font-mono">
                           {p.totalDebit > 0 ? formatCurrency(p.totalDebit) : '-'}
                         </td>
 
-                        {/* Consolidated Credit */}
                         <td className="px-4 py-3 text-right text-slate-600 font-mono">
                           {p.totalCredit > 0 ? formatCurrency(p.totalCredit) : '-'}
                         </td>
 
-                        {/* Net Consolidated */}
                         <td className="px-5 py-3 text-right whitespace-nowrap">
                           <span className={`font-black text-sm font-mono ${
                             p.status === 'Dr' ? 'text-amber-700' : p.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
@@ -770,7 +940,6 @@ export default function Dashboard() {
                           </span>
                         </td>
 
-                        {/* Action 360 */}
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={(e) => {
@@ -780,7 +949,7 @@ export default function Dashboard() {
                             className="inline-flex items-center space-x-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
+                            <span>T-Ledger</span>
                           </button>
                         </td>
                       </tr>
@@ -793,11 +962,601 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ==================== TAB 2: BRANCHES & IMPORT ==================== */}
+        {/* ==================== TAB 2: DECLARE LEDGERS AS BRANCH (BY CODE) ==================== */}
+        {companies.length > 0 && activeTab === 'declare' && (
+          <div className="space-y-6">
+            
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Tag className="w-5 h-5 text-purple-600" />
+                  <h2 className="text-lg font-bold text-slate-900">
+                    लेजर को ब्रांच डिक्लेयर करें (Declare Ledgers as Branch by Code)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  लेजर को नाम से फ़िल्टर करें, सेलेक्ट करें और उसे एक ब्रांच कोड दें। फिर वे सभी लेजर उसी कोड से एज़ ए ब्रांच दिखेंगे और उनका बैलेंस आपस में मैच होगा।
+                </p>
+              </div>
+
+              {availableDeclaredCodes.length > 0 && (
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs text-slate-500 font-semibold">Declared Codes:</span>
+                  {availableDeclaredCodes.map(code => (
+                    <span key={code} className="px-2.5 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-bold font-mono">
+                      🏷️ {code}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-700">
+                  चयनित लेजर: <b className="text-purple-700">{declareSelectedNames.length}</b>
+                </span>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Branch Code दर्ज करें (उदा. BHW, JOG, DEL)"
+                    value={assignBranchCode}
+                    onChange={(e) => setAssignBranchCode(e.target.value)}
+                    className="bg-white border border-purple-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-purple-500 w-56 font-mono"
+                  />
+
+                  {branches.length > 0 && (
+                    <div className="hidden sm:flex items-center space-x-1">
+                      <span className="text-[10px] text-slate-400">Quick:</span>
+                      {branches.map(b => (
+                        <button
+                          key={b.id}
+                          onClick={() => setAssignBranchCode(b.code)}
+                          className="px-2 py-0.5 bg-white hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold text-purple-700 font-mono"
+                        >
+                          {b.code}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  disabled={declareSelectedNames.length === 0 || !assignBranchCode.trim()}
+                  onClick={handleAssignBranchCode}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold shadow transition flex items-center space-x-1.5 ${
+                    declareSelectedNames.length === 0 || !assignBranchCode.trim()
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-500 text-white'
+                  }`}
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>ब्रांच कोड लागू करें (Apply Branch Code)</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setActiveTab('interbranch')}
+                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 transition flex items-center space-x-1.5"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
+                <span>आपसी बैलेंस मैच देखें →</span>
+              </button>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
+                <Search className="w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="लेजर का नाम फ़िल्टर करें (Filter ledger by name)..."
+                  value={declareSearch}
+                  onChange={(e) => setDeclareSearch(e.target.value)}
+                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                />
+                {declareSearch && (
+                  <button onClick={() => setDeclareSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={declaredOnlyFilter}
+                    onChange={(e) => setDeclaredOnlyFilter(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  />
+                  <span>केवल डिक्लेयर्ड ब्रांच लेजर्स दिखाएं</span>
+                </label>
+
+                <button
+                  onClick={() => fetchDeclaredLedgers(selectedCompanyId)}
+                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                >
+                  <RefreshCw className={`w-4 h-4 ${declareLoading ? 'animate-spin text-purple-600' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto max-h-[500px]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 w-10 text-center">
+                        <button onClick={toggleSelectAllDeclare} className="text-slate-600 hover:text-slate-900">
+                          {declareSelectedNames.length > 0 && declareSelectedNames.length === declareLedgers.length ? (
+                            <CheckSquare className="w-4 h-4 text-purple-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
+                        </button>
+                      </th>
+                      <th className="px-4 py-3">लेजर का नाम (Ledger Name)</th>
+                      <th className="px-4 py-3">ब्रांच (Branch)</th>
+                      <th className="px-4 py-3 text-center">डिक्लेयर्ड कोड (Declared Code)</th>
+                      <th className="px-4 py-3 text-right">Debit (नाम)</th>
+                      <th className="px-4 py-3 text-right">Credit (जमा)</th>
+                      <th className="px-4 py-3 text-right font-black">Net Balance</th>
+                      <th className="px-4 py-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {declareLoading && (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                          <span>Searching ledgers...</span>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!declareLoading && declareLedgers.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          No ledgers found matching criteria
+                        </td>
+                      </tr>
+                    )}
+
+                    {!declareLoading && declareLedgers.map((item) => {
+                      const isSelected = declareSelectedNames.includes(item.partyName);
+                      return (
+                        <tr
+                          key={`${item.branchId}_${item.partyName}`}
+                          className={`hover:bg-purple-50/40 transition cursor-pointer ${
+                            isSelected ? 'bg-purple-50/60' : item.isBranchDeclared ? 'bg-purple-50/20' : ''
+                          }`}
+                          onClick={() => toggleSelectDeclare(item.partyName)}
+                        >
+                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => toggleSelectDeclare(item.partyName)}>
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-purple-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-300" />
+                              )}
+                            </button>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-900 font-bold">
+                            <div className="flex items-center space-x-2">
+                              <span>{item.partyName}</span>
+                              {item.isBranchDeclared && (
+                                <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-[10px] font-bold font-mono">
+                                  BRANCH: {item.declaredBranchCode}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-600 font-semibold">{item.branchName}</td>
+
+                          <td className="px-4 py-3 text-center">
+                            {item.isBranchDeclared ? (
+                              <span className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-bold font-mono text-xs">
+                                🏷️ {item.declaredBranchCode}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 italic text-[11px]">Not declared</span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                            {item.totalDebit > 0 ? formatCurrency(item.totalDebit) : '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                            {item.totalCredit > 0 ? formatCurrency(item.totalCredit) : '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-right whitespace-nowrap font-bold font-mono">
+                            <span className={item.status === 'Dr' ? 'text-amber-700' : item.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'}>
+                              {formatCurrency(Math.abs(item.netBalance))}
+                            </span>
+                            <span className={`text-[10px] ml-1 font-bold ${
+                              item.status === 'Dr' ? 'text-amber-600' : 'text-emerald-600'
+                            }`}>
+                              {item.status}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            {item.isBranchDeclared ? (
+                              <button
+                                onClick={() => handleRemoveDeclaration(item.partyName)}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-semibold border border-rose-200 transition"
+                              >
+                                Remove Code
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setDeclareSelectedNames([item.partyName]);
+                                }}
+                                className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-semibold border border-purple-200 transition"
+                              >
+                                Select
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ==================== TAB 3: INTER-BRANCH RECONCILIATION ==================== */}
+        {companies.length > 0 && activeTab === 'interbranch' && (
+          <div className="space-y-6">
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">आपसी ब्रांच रिकंसीलेशन (Inter-Branch Books Reconciliation)</h2>
+                <p className="text-xs text-slate-500">
+                  दो ब्रांचेस के डिक्लेयर्ड कोड अनुसार खातों का मिलान करें और अंतर (Mismatch / Discrepancy) जांचें
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveTab('declare')}
+                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>लेजर को कोड दें</span>
+                </button>
+
+                <button
+                  onClick={fetchInterBranch}
+                  className="inline-flex items-center space-x-1 px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${ibLoading ? 'animate-spin' : ''}`} />
+                  <span>Re-check Books</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    First Branch (ब्रांच 1)
+                  </label>
+                  <select
+                    value={ibBranch1}
+                    onChange={(e) => setIbBranch1(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Second Branch (ब्रांच 2)
+                  </label>
+                  <select
+                    value={ibBranch2}
+                    onChange={(e) => setIbBranch2(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {ibData?.reconciliation && (
+              <>
+                <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                  ibData.reconciliation.isReconciled
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  <div className="flex items-center space-x-3">
+                    {ibData.reconciliation.isReconciled ? (
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-8 h-8 text-rose-600 shrink-0" />
+                    )}
+                    <div>
+                      <h4 className="font-extrabold text-base">
+                        {ibData.reconciliation.statusText}
+                      </h4>
+                      <p className="text-xs mt-0.5 opacity-90">
+                        {ibData.reconciliation.isReconciled
+                          ? 'दोनों ब्रांचेस के आपसी खाते पूर्ण रूप से मेल खाते हैं (0 Difference).'
+                          : `अंतर राशि: ₹${ibData.reconciliation.difference.toLocaleString('en-IN')}.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-xs uppercase font-bold tracking-wider opacity-75">Net Difference</span>
+                    <div className="text-xl font-black font-mono">
+                      {formatCurrency(ibData.reconciliation.difference)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch1Book.branchName}</h4>
+                        <span className="text-xs text-slate-500 font-mono">Branch Code: {ibData.reconciliation.branch1Book.branchCode}</span>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                        ibData.reconciliation.branch1Book.balanceType === 'Dr'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {formatCurrency(Math.abs(ibData.reconciliation.branch1Book.netBalance))} {ibData.reconciliation.branch1Book.balanceType}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1">
+                      <span className="text-slate-500 font-bold">Accounts representing other branch:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ibData.reconciliation.branch1Book.matchedAccounts.length === 0 ? (
+                          <div className="text-slate-400 italic text-xs py-1">
+                            कोई लेजर इस ब्रांच कोड से लिंक नहीं है। <button onClick={() => setActiveTab('declare')} className="text-purple-600 underline font-semibold">लेजर को कोड दें</button>
+                          </div>
+                        ) : (
+                          ibData.reconciliation.branch1Book.matchedAccounts.map((a: any) => (
+                            <span key={a.name} className="px-2 py-0.5 bg-purple-50 border border-purple-200 rounded text-purple-900 font-semibold">
+                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 text-xs">
+                      <span className="text-slate-500 block mb-2 font-bold">Recent Cross Vouchers:</span>
+                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                        {ibData.reconciliation.branch1Book.vouchers.length === 0 ? (
+                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
+                        ) : (
+                          ibData.reconciliation.branch1Book.vouchers.map((v: any) => (
+                            <div key={v._id} className="py-1.5 flex justify-between">
+                              <span className="text-slate-600 font-mono">{v.dateStr} ({v.voucherType})</span>
+                              <span className="font-mono font-semibold">{v.primaryParty}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch2Book.branchName}</h4>
+                        <span className="text-xs text-slate-500 font-mono">Branch Code: {ibData.reconciliation.branch2Book.branchCode}</span>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                        ibData.reconciliation.branch2Book.balanceType === 'Dr'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {formatCurrency(Math.abs(ibData.reconciliation.branch2Book.netBalance))} {ibData.reconciliation.branch2Book.balanceType}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1">
+                      <span className="text-slate-500 font-bold">Accounts representing other branch:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ibData.reconciliation.branch2Book.matchedAccounts.length === 0 ? (
+                          <div className="text-slate-400 italic text-xs py-1">
+                            कोई लेजर इस ब्रांच कोड से लिंक नहीं है। <button onClick={() => setActiveTab('declare')} className="text-purple-600 underline font-semibold">लेजर को कोड दें</button>
+                          </div>
+                        ) : (
+                          ibData.reconciliation.branch2Book.matchedAccounts.map((a: any) => (
+                            <span key={a.name} className="px-2 py-0.5 bg-purple-50 border border-purple-200 rounded text-purple-900 font-semibold">
+                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 text-xs">
+                      <span className="text-slate-500 block mb-2 font-bold">Recent Cross Vouchers:</span>
+                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                        {ibData.reconciliation.branch2Book.vouchers.length === 0 ? (
+                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
+                        ) : (
+                          ibData.reconciliation.branch2Book.vouchers.map((v: any) => (
+                            <div key={v._id} className="py-1.5 flex justify-between">
+                              <span className="text-slate-600 font-mono">{v.dateStr} ({v.voucherType})</span>
+                              <span className="font-mono font-semibold">{v.primaryParty}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+          </div>
+        )}
+
+        {/* ==================== TAB 4: EXCEPTIONS REPORT (IGNORED ENTRIES) ==================== */}
+        {companies.length > 0 && activeTab === 'exceptions' && (
+          <div className="space-y-6">
+            
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-5 h-5 text-rose-600" />
+                  <h2 className="text-lg font-bold text-slate-900">
+                    एक्सेप्शंस रिपोर्ट (Exceptions Report - Ignored Entries)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  गलत या अमान्य एंट्रियां जिन्हें लेजर और बैलेंस से अलग कर दिया गया है। आप इन्हें यहाँ देखकर कभी भी वापस लेजर में शामिल कर सकते हैं।
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => fetchExceptions(selectedCompanyId)}
+                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                >
+                  <RefreshCw className={`w-4 h-4 ${exceptionsLoading ? 'animate-spin text-rose-600' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Search */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
+                <Search className="w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="खोजें (Search party, voucher no, type)..."
+                  value={exceptionsSearch}
+                  onChange={(e) => setExceptionsSearch(e.target.value)}
+                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                />
+                {exceptionsSearch && (
+                  <button onClick={() => setExceptionsSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs font-bold text-slate-600">
+                कुल एक्सेप्शंस: <span className="text-rose-600 font-mono text-sm">{exceptions.length}</span>
+              </div>
+            </div>
+
+            {/* Exceptions Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto max-h-[500px]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3">Date (तारीख)</th>
+                      <th className="px-4 py-3">Branch (ब्रांच)</th>
+                      <th className="px-4 py-3">Type & Voucher No</th>
+                      <th className="px-4 py-3">पार्टी का नाम (Party Name)</th>
+                      <th className="px-4 py-3">काउंटर खाता (Counter Account)</th>
+                      <th className="px-4 py-3 text-right">राशि (Amount)</th>
+                      <th className="px-4 py-3">इग्नोर कारण (Reason)</th>
+                      <th className="px-4 py-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {exceptionsLoading && (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          <div className="w-8 h-8 border-3 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                          <span>Loading exceptions report...</span>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!exceptionsLoading && exceptions.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                          <p className="font-bold text-slate-700">कोई एक्सेप्शन एंट्री नहीं है (No Ignored Entries)</p>
+                          <p className="text-xs text-slate-400 mt-0.5">सभी एंट्रियां लेजर में सक्रिय हैं। जब आप किसी लेजर से किसी गलत एंट्री को 'Ignore' करेंगे, वह यहाँ दिखाई देगी।</p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!exceptionsLoading && exceptions.map((item) => (
+                      <tr key={item.id} className="hover:bg-rose-50/40 transition">
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-600 font-mono">{item.dateStr}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">
+                            {item.branchName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mr-1">
+                            {item.voucherType}
+                          </span>
+                          <span className="font-mono text-slate-700 font-semibold">{item.voucherNo}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-900 font-bold">{item.primaryParty}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.counterAccount || '-'}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                          {formatCurrency(item.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 italic max-w-xs truncate" title={item.ignoredReason}>
+                          {item.ignoredReason}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            disabled={restoringId === item.id}
+                            onClick={() => handleRestoreEntry(item.id)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition"
+                            title="Restore this voucher back to regular ledger"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Restore (वापस जोड़ें)</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ==================== TAB 5: BRANCHES & IMPORT ==================== */}
         {companies.length > 0 && activeTab === 'branches' && (
           <div className="space-y-6">
             
-            {/* Header + Add Branch Button */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">ब्रांचेस प्रबंधन (Branch Management)</h2>
@@ -815,7 +1574,6 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Branches Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {branches.map((b) => (
                 <div
@@ -893,7 +1651,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Target Branch Selector */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -920,18 +1677,16 @@ export default function Dashboard() {
                       onChange={(e) => setImportClearExisting(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                     />
-                    <span>इस ब्रांच का पिछला डेटा रीप्लेस करें (Replace existing data for this branch)</span>
+                    <span>इस ब्रांच का पिछला डेटा रीप्लेस करें (Replace existing data)</span>
                   </label>
                 </div>
               </div>
 
-              {/* Upload Dropzone */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                 
-                {/* Method 1: Choose File */}
                 <div className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl p-6 text-center bg-slate-50/50">
                   <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                  <div className="text-sm font-semibold text-slate-700">अपनी DayBook.txt फ़ाइल चुनें</div>
+                  <div className="text-sm font-semibold text-slate-700">अपनी DayBook.txt / .CSV फ़ाइल चुनें</div>
                   <p className="text-xs text-slate-400 mt-1">Supports Tally DayBook .TXT and .CSV export</p>
                   
                   <input
@@ -972,20 +1727,19 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Method 2: Fast 1-Click Sample Import */}
                 <div className="border border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-2xl p-6 text-left relative overflow-hidden">
                   <div className="flex items-center space-x-2 text-indigo-700 font-bold text-sm mb-1">
                     <Zap className="w-4 h-4 text-amber-500" />
-                    <span>⚡ 1-Click Fast Import (Sample DayBook.txt)</span>
+                    <span>⚡ 1-Click Fast Import (Sample DayBook)</span>
                   </div>
                   <p className="text-xs text-slate-600 mt-1 mb-3">
-                    डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">DayBook.txt</code> (11,608 वाउचर्स) को सीधे एक क्लिक में इस ब्रांच में इम्पोर्ट करें!
+                    डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">DayBook.CSV / DayBook.txt</code> को सीधे एक क्लिक में इस ब्रांच में इम्पोर्ट करें!
                   </p>
 
                   <div className="bg-white/80 rounded-xl p-3 border border-indigo-100 text-[11px] text-slate-600 space-y-1 mb-4">
-                    <div>• Path: <code>c:\Users\USER\Desktop\BOOKS MATCH\DayBook.txt</code></div>
-                    <div>• Vouchers: <b>11,608</b> | Size: <b>1.56 MB</b></div>
-                    <div>• Stores instantly in MongoDB <code>focustube</code> collection</div>
+                    <div>• Path: <code>c:\Users\USER\Desktop\BOOKS MATCH\DayBook.CSV</code></div>
+                    <div>• 100% Balanced vouchers (Total Dr == Total Cr, Sum == 0)</div>
+                    <div>• Stores directly in MongoDB <code>focustube</code> collection</div>
                   </div>
 
                   <button
@@ -1000,12 +1754,12 @@ export default function Dashboard() {
                     {importing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Processing 11,608 vouchers...</span>
+                        <span>Processing vouchers...</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        <span>⚡ 1-Click Import Local DayBook.txt</span>
+                        <span>⚡ 1-Click Import Local DayBook</span>
                       </>
                     )}
                   </button>
@@ -1013,7 +1767,6 @@ export default function Dashboard() {
 
               </div>
 
-              {/* Import Result Summary Card */}
               {importResult && (
                 <div className="mt-6 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs space-y-3">
                   <div className="flex items-center justify-between">
@@ -1045,20 +1798,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Voucher types breakdown */}
-                  {importResult.voucherTypesBreakdown && (
-                    <div className="pt-2">
-                      <span className="font-bold text-emerald-950 block mb-2">Voucher Types Breakdown:</span>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(importResult.voucherTypesBreakdown).map(([k, v]: [string, any]) => (
-                          <span key={k} className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-[11px] font-semibold text-slate-700">
-                            <b>{k}</b>: {v.count} vouchers
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   <div className="pt-2 flex justify-end">
                     <button
                       onClick={() => setActiveTab('matrix')}
@@ -1075,208 +1814,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ==================== TAB 3: INTER-BRANCH RECONCILIATION ==================== */}
-        {companies.length > 0 && activeTab === 'interbranch' && (
-          <div className="space-y-6">
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">आपसी ब्रांच रिकंसीलेशन (Inter-Branch Books Reconciliation)</h2>
-                <p className="text-xs text-slate-500">
-                  दो ब्रांचेस के आपसी खातों का मिलान करें और अंतर (Mismatch / Discrepancy) जांचें
-                </p>
-              </div>
-
-              <button
-                onClick={fetchInterBranch}
-                className="inline-flex items-center space-x-1 px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${ibLoading ? 'animate-spin' : ''}`} />
-                <span>Re-check Books</span>
-              </button>
-            </div>
-
-            {/* Branch Selector Cards */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    First Branch (ब्रांच 1)
-                  </label>
-                  <select
-                    value={ibBranch1}
-                    onChange={(e) => setIbBranch1(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Second Branch (ब्रांच 2)
-                  </label>
-                  <select
-                    value={ibBranch2}
-                    onChange={(e) => setIbBranch2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Reconciliation Comparison Cards */}
-            {ibData?.reconciliation && (
-              <>
-                {/* Result Status Banner */}
-                <div className={`p-4 rounded-2xl border flex items-center justify-between ${
-                  ibData.reconciliation.isReconciled
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border-rose-200 text-rose-900'
-                }`}>
-                  <div className="flex items-center space-x-3">
-                    {ibData.reconciliation.isReconciled ? (
-                      <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
-                    ) : (
-                      <AlertTriangle className="w-8 h-8 text-rose-600 shrink-0" />
-                    )}
-                    <div>
-                      <h4 className="font-extrabold text-base">
-                        {ibData.reconciliation.statusText}
-                      </h4>
-                      <p className="text-xs mt-0.5 opacity-90">
-                        {ibData.reconciliation.isReconciled
-                          ? 'दोनों ब्रांचेस के आपसी खाते पूर्ण रूप से मेल खाते हैं (0 Difference).'
-                          : `अंतर राशि: ₹${ibData.reconciliation.difference.toLocaleString('en-IN')}. कृपया नीचे दी गई एंट्रीज का मिलान करें.`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xs uppercase font-bold tracking-wider opacity-75">Net Difference</span>
-                    <div className="text-xl font-black font-mono">
-                      {formatCurrency(ibData.reconciliation.difference)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Side by side comparison */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Branch 1's Books */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch1Book.branchName}</h4>
-                        <span className="text-xs text-slate-500">Books showing cross balance</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ibData.reconciliation.branch1Book.balanceType === 'Dr'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {formatCurrency(Math.abs(ibData.reconciliation.branch1Book.netBalance))} {ibData.reconciliation.branch1Book.balanceType}
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1">
-                      <span className="text-slate-500 font-bold">Matched Accounts:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ibData.reconciliation.branch1Book.matchedAccounts.length === 0 ? (
-                          <span className="text-slate-400 italic">No direct inter-branch account found</span>
-                        ) : (
-                          ibData.reconciliation.branch1Book.matchedAccounts.map((a: any) => (
-                            <span key={a.name} className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 font-semibold">
-                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 text-xs">
-                      <span className="text-slate-500 block mb-2 font-bold">Recent Inter-branch Vouchers:</span>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                        {ibData.reconciliation.branch1Book.vouchers.length === 0 ? (
-                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
-                        ) : (
-                          ibData.reconciliation.branch1Book.vouchers.map((v: any) => (
-                            <div key={v._id} className="py-1.5 flex justify-between">
-                              <span className="text-slate-600">{v.dateStr} ({v.voucherType})</span>
-                              <span className="font-mono font-semibold">{v.primaryParty}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Branch 2's Books */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-base">{ibData.reconciliation.branch2Book.branchName}</h4>
-                        <span className="text-xs text-slate-500">Books showing cross balance</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        ibData.reconciliation.branch2Book.balanceType === 'Dr'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {formatCurrency(Math.abs(ibData.reconciliation.branch2Book.netBalance))} {ibData.reconciliation.branch2Book.balanceType}
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1">
-                      <span className="text-slate-500 font-bold">Matched Accounts:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ibData.reconciliation.branch2Book.matchedAccounts.length === 0 ? (
-                          <span className="text-slate-400 italic">No direct inter-branch account found</span>
-                        ) : (
-                          ibData.reconciliation.branch2Book.matchedAccounts.map((a: any) => (
-                            <span key={a.name} className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 font-semibold">
-                              {a.name} ({formatCurrency(Math.abs(a.net))} {a.status})
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 text-xs">
-                      <span className="text-slate-500 block mb-2 font-bold">Recent Inter-branch Vouchers:</span>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                        {ibData.reconciliation.branch2Book.vouchers.length === 0 ? (
-                          <div className="text-slate-400 text-center py-4">No cross entries found</div>
-                        ) : (
-                          ibData.reconciliation.branch2Book.vouchers.map((v: any) => (
-                            <div key={v._id} className="py-1.5 flex justify-between">
-                              <span className="text-slate-600">{v.dateStr} ({v.voucherType})</span>
-                              <span className="font-mono font-semibold">{v.primaryParty}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </>
-            )}
-
-          </div>
-        )}
-
-        {/* ==================== TAB 4: RESET & MAINTENANCE ==================== */}
+        {/* ==================== TAB 6: RESET & MAINTENANCE ==================== */}
         {companies.length > 0 && activeTab === 'reset' && (
           <div className="space-y-6 max-w-4xl mx-auto">
             
@@ -1293,7 +1831,6 @@ export default function Dashboard() {
               </p>
 
               <div className="space-y-4">
-                {/* Reset Branch */}
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-slate-800 text-sm">चयनित ब्रांच का डेटा हटाएं (Clear Branch Vouchers)</h4>
@@ -1309,7 +1846,6 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* Reset Company Data */}
                 <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-amber-900 text-sm">पूरी कंपनी का डेटा हटाएं (Clear Company Data)</h4>
@@ -1325,7 +1861,6 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* Complete Database Wipe */}
                 <div className="p-4 rounded-xl border border-rose-300 bg-rose-50/70 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-rose-950 text-sm">संपूर्ण डेटाबेस रीसेट (Complete Database Wipe)</h4>
@@ -1350,12 +1885,16 @@ export default function Dashboard() {
 
       {/* ==================== MODALS ==================== */}
 
-      {/* 360 Party Ledger Drawer / Modal */}
+      {/* 360 T-Format Party Ledger Modal */}
       {selectedParty && selectedCompanyId && (
         <PartyLedgerModal
           partyName={selectedParty}
           companyId={selectedCompanyId}
           onClose={() => setSelectedParty(null)}
+          onVoucherIgnored={() => {
+            fetchExceptions(selectedCompanyId);
+            fetchMatrix(selectedCompanyId);
+          }}
         />
       )}
 
