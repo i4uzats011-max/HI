@@ -654,36 +654,56 @@ export default function Dashboard() {
 
       {/* Top Bar Header */}
       <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-16 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
           
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Scale className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-black tracking-wide text-white">BOOKS MATCH</h1>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 border border-indigo-400/40 text-indigo-300 px-2 py-0.5 rounded-full">
-                  Multi-Branch
-                </span>
+          <div className="flex items-center justify-between sm:justify-start">
+            <div className="flex items-center space-x-2.5 sm:space-x-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+                <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <p className="text-xs text-slate-400">T-Format Ledger & DayBook Reconciliation System</p>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-base sm:text-lg font-black tracking-wide text-white">BOOKS MATCH</h1>
+                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 border border-indigo-400/40 text-indigo-300 px-1.5 sm:px-2 py-0.5 rounded-full">
+                    Multi-Branch
+                  </span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-400">T-Format Ledger & DayBook Reconciliation</p>
+              </div>
+            </div>
+
+            {/* Mobile Actions: Add Company & Reset */}
+            <div className="flex sm:hidden items-center space-x-1.5">
+              <button
+                onClick={() => setShowNewCompanyModal(true)}
+                className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow active:scale-95 transition"
+                title="Add New Company"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setResetModal({ open: true, type: 'company', name: selectedCompany?.name })}
+                className="p-2 text-slate-400 hover:text-rose-400 active:scale-95 rounded-xl bg-slate-800 transition"
+                title="Delete or Reset Data"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
             <div className="hidden md:flex items-center space-x-1.5 px-3 py-1 bg-slate-800/80 rounded-lg border border-slate-700/60 text-xs text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <Database className="w-3.5 h-3.5 text-slate-400" />
               <span>MongoDB: focustube</span>
             </div>
 
-            <div className="flex items-center space-x-2 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1">
-              <Building className="w-4 h-4 text-indigo-400" />
+            <div className="flex items-center space-x-2 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 flex-1 sm:flex-initial">
+              <Building className="w-4 h-4 text-indigo-400 shrink-0" />
               <select
                 value={selectedCompanyId}
                 onChange={(e) => setSelectedCompanyId(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-white focus:outline-none cursor-pointer pr-2"
+                className="bg-transparent text-xs sm:text-sm font-semibold text-white focus:outline-none cursor-pointer pr-2 w-full"
               >
                 {companies.length === 0 ? (
                   <option value="">No Company Found</option>
@@ -699,16 +719,16 @@ export default function Dashboard() {
 
             <button
               onClick={() => setShowNewCompanyModal(true)}
-              className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow transition"
+              className="hidden sm:inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow transition active:scale-95"
               title="Add New Company"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">New Company</span>
+              <span>New Company</span>
             </button>
 
             <button
               onClick={() => setResetModal({ open: true, type: 'company', name: selectedCompany?.name })}
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
+              className="hidden sm:inline-flex p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition active:scale-95"
               title="Delete or Reset Data"
             >
               <Trash2 className="w-4 h-4" />
@@ -716,11 +736,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-slate-800/80 overflow-x-auto">
+        {/* Navigation Tabs - Swipable touch bar on mobile */}
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 flex space-x-1 border-t border-slate-800/80 overflow-x-auto touch-scroll no-scrollbar py-0.5">
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'matrix'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -730,10 +750,10 @@ export default function Dashboard() {
             <span>पार्टी मैट्रिक्स (Party Matrix)</span>
           </button>
 
-          {/* New Tab: Ledger Grouping */}
+          {/* Tab: Ledger Grouping */}
           <button
             onClick={() => setActiveTab('groups')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'groups'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -750,7 +770,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab('declare')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'declare'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -762,7 +782,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab('interbranch')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'interbranch'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -774,7 +794,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab('exceptions')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'exceptions'
                 ? 'border-rose-500 text-rose-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -791,7 +811,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab('branches')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'branches'
                 ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -808,7 +828,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab('reset')}
-            className={`flex items-center space-x-2 py-3 px-4 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 py-2.5 px-3 sm:py-3 sm:px-4 text-xs font-bold border-b-2 transition whitespace-nowrap shrink-0 active:scale-95 ${
               activeTab === 'reset'
                 ? 'border-rose-500 text-rose-400 bg-slate-800/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -821,18 +841,18 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 space-y-4 sm:space-y-6">
 
         {companies.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm max-w-lg mx-auto mt-10">
-            <Building2 className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900">कंपनी बनाएं (Create First Company)</h2>
-            <p className="text-sm text-slate-500 mt-2 mb-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-12 text-center shadow-sm max-w-lg mx-auto mt-6 sm:mt-10">
+            <Building2 className="w-12 h-12 sm:w-16 sm:h-16 text-indigo-600 mx-auto mb-4" />
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">कंपनी बनाएं (Create First Company)</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-2 mb-6">
               शुरू करने के लिए अपनी कंपनी का नाम दर्ज करें। इसके बाद आप ब्रांचेस बनाकर DayBook इम्पोर्ट कर सकेंगे।
             </p>
             <button
               onClick={() => setShowNewCompanyModal(true)}
-              className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition"
+              className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>+ Create Company Now</span>
@@ -842,64 +862,64 @@ export default function Dashboard() {
 
         {/* ==================== TAB 1: RECONCILIATION MATRIX ==================== */}
         {companies.length > 0 && activeTab === 'matrix' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
-                  <Layers className="w-5 h-5" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                <div className="p-2 sm:p-3 bg-indigo-50 rounded-xl text-indigo-600 shrink-0">
+                  <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">कुल पार्टियां (Parties)</div>
-                  <div className="text-xl font-black text-slate-900 mt-0.5">
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">कुल पार्टियां (Parties)</div>
+                  <div className="text-base sm:text-xl font-black text-slate-900 mt-0.5 truncate">
                     {matrixData?.stats?.totalParties || 0}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                <div className="p-3 bg-purple-50 rounded-xl text-purple-600">
-                  <ArrowRightLeft className="w-5 h-5" />
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                <div className="p-2 sm:p-3 bg-purple-50 rounded-xl text-purple-600 shrink-0">
+                  <ArrowRightLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">मल्टी-ब्रांच पार्टियां</div>
-                  <div className="text-xl font-black text-purple-700 mt-0.5">
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">मल्टी-ब्रांच पार्टियां</div>
+                  <div className="text-base sm:text-xl font-black text-purple-700 mt-0.5 truncate">
                     {matrixData?.stats?.multiBranchCount || 0}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
-                  <TrendingUp className="w-5 h-5" />
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                <div className="p-2 sm:p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">कुल लेना है (Receivable Dr)</div>
-                  <div className="text-lg font-black text-amber-700 mt-0.5">
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">कुल लेना है (Dr)</div>
+                  <div className="text-sm sm:text-lg font-black text-amber-700 mt-0.5 font-mono truncate">
                     {formatCurrency(matrixData?.stats?.totalReceivable || 0)}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
-                  <TrendingDown className="w-5 h-5" />
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                <div className="p-2 sm:p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+                  <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">कुल देना है (Payable Cr)</div>
-                  <div className="text-lg font-black text-emerald-700 mt-0.5">
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">कुल देना है (Cr)</div>
+                  <div className="text-sm sm:text-lg font-black text-emerald-700 mt-0.5 font-mono truncate">
                     {formatCurrency(matrixData?.stats?.totalPayable || 0)}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                <div className="p-3 bg-slate-100 rounded-xl text-slate-700">
-                  <Scale className="w-5 h-5" />
+              <div className="col-span-2 sm:col-span-1 bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                <div className="p-2 sm:p-3 bg-slate-100 rounded-xl text-slate-700 shrink-0">
+                  <Scale className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">नेट पोजीशन (Net Balance)</div>
-                  <div className={`text-lg font-black mt-0.5 ${
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">नेट पोजीशन (Net Balance)</div>
+                  <div className={`text-sm sm:text-lg font-black mt-0.5 font-mono truncate ${
                     (matrixData?.stats?.netConsolidated || 0) >= 0 ? 'text-amber-700' : 'text-emerald-700'
                   }`}>
                     {formatCurrency(Math.abs(matrixData?.stats?.netConsolidated || 0))}
@@ -911,121 +931,134 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="पार्टी या लेजर का नाम खोजें (Search party)..."
-                  value={matrixSearch}
-                  onChange={(e) => setMatrixSearch(e.target.value)}
-                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
-                />
-                {matrixSearch && (
-                  <button onClick={() => setMatrixSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
-                    ✕
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="पार्टी या लेजर का नाम खोजें..."
+                    value={matrixSearch}
+                    onChange={(e) => setMatrixSearch(e.target.value)}
+                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                  />
+                  {matrixSearch && (
+                    <button onClick={() => setMatrixSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 justify-end">
+                  <button
+                    onClick={() => fetchMatrix(selectedCompanyId)}
+                    className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition active:scale-95"
+                    title="Refresh Matrix"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${matrixLoading ? 'animate-spin text-indigo-600' : ''}`} />
                   </button>
-                )}
+
+                  <a
+                    href={`/api/export?type=matrix&companyId=${encodeURIComponent(selectedCompanyId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow transition active:scale-95"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span className="hidden sm:inline">Export Matrix to Excel</span>
+                    <span className="sm:hidden">Excel</span>
+                  </a>
+                </div>
               </div>
 
-              {/* View Mode Toggle: Individual vs Groups */}
-              <div className="flex items-center space-x-1 bg-indigo-50 border border-indigo-200 p-1 rounded-xl text-xs font-bold">
-                <button
-                  onClick={() => setMatrixViewMode('individual')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    matrixViewMode === 'individual' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
-                  }`}
-                >
-                  व्यक्तिगत लेजर्स (Individual)
-                </button>
-                <button
-                  onClick={() => setMatrixViewMode('groups')}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1 ${
-                    matrixViewMode === 'groups' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
-                  }`}
-                >
-                  <Boxes className="w-3.5 h-3.5" />
-                  <span>ग्रुप दृश्य (Group View {matrixData?.groups?.length ? `(${matrixData.groups.length})` : ''})</span>
-                </button>
-              </div>
+              {/* View Mode Toggle and Filter Pills (Horizontal swipeable on mobile) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                {/* View Mode Toggle: Individual vs Groups */}
+                <div className="flex items-center space-x-1 bg-indigo-50 border border-indigo-200 p-1 rounded-xl text-xs font-bold overflow-x-auto touch-scroll no-scrollbar shrink-0">
+                  <button
+                    onClick={() => setMatrixViewMode('individual')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
+                      matrixViewMode === 'individual' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
+                    }`}
+                  >
+                    व्यक्तिगत लेजर्स (Individual)
+                  </button>
+                  <button
+                    onClick={() => setMatrixViewMode('groups')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shrink-0 active:scale-95 ${
+                      matrixViewMode === 'groups' ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 hover:text-indigo-950'
+                    }`}
+                  >
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>ग्रुप दृश्य {matrixData?.groups?.length ? `(${matrixData.groups.length})` : ''}</span>
+                  </button>
+                </div>
 
-              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                <button
-                  onClick={() => setMatrixFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    matrixFilter === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All Parties (सभी)
-                </button>
-                <button
-                  onClick={() => setMatrixFilter('multi_branch')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    matrixFilter === 'multi_branch' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Multi-Branch Only ({matrixData?.stats?.multiBranchCount || 0})
-                </button>
-                <button
-                  onClick={() => setMatrixFilter('dr')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    matrixFilter === 'dr' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Receivables (लेना है / Dr)
-                </button>
-                <button
-                  onClick={() => setMatrixFilter('cr')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    matrixFilter === 'cr' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Payables (देना है / Cr)
-                </button>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => fetchMatrix(selectedCompanyId)}
-                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
-                  title="Refresh Matrix"
-                >
-                  <RefreshCw className={`w-4 h-4 ${matrixLoading ? 'animate-spin text-indigo-600' : ''}`} />
-                </button>
-
-                <a
-                  href={`/api/export?type=matrix&companyId=${encodeURIComponent(selectedCompanyId)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Export Matrix to Excel</span>
-                </a>
+                {/* Filter Pills */}
+                <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto touch-scroll no-scrollbar">
+                  <button
+                    onClick={() => setMatrixFilter('all')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
+                      matrixFilter === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All Parties (सभी)
+                  </button>
+                  <button
+                    onClick={() => setMatrixFilter('multi_branch')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
+                      matrixFilter === 'multi_branch' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Multi-Branch ({matrixData?.stats?.multiBranchCount || 0})
+                  </button>
+                  <button
+                    onClick={() => setMatrixFilter('dr')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
+                      matrixFilter === 'dr' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Receivables (Dr)
+                  </button>
+                  <button
+                    onClick={() => setMatrixFilter('cr')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
+                      matrixFilter === 'cr' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Payables (Cr)
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Matrix Table */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
+              {/* Mobile swipe hint banner */}
+              <div className="sm:hidden bg-indigo-50 border-b border-indigo-100 px-3 py-1.5 flex items-center justify-between text-[11px] text-indigo-900 font-semibold">
+                <span>👈 पार्टियां व शाखा बैलेंस देखने हेतु स्वाइप करें</span>
+                <span className="text-[10px] bg-white text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 font-bold">Swipe 👉</span>
+              </div>
+
+              <div className="overflow-x-auto touch-scroll max-h-[600px]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100/90 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
+                  <thead className="bg-slate-100/90 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0 z-20">
                     <tr>
-                      <th className="px-5 py-3.5">
-                        {matrixViewMode === 'groups' ? 'ग्रुप का नाम (Ledger Group Name)' : 'पार्टी का नाम (Party / Ledger Name)'}
+                      <th className="px-3.5 sm:px-5 py-3 sm:py-3.5 sticky left-0 z-30 bg-slate-100 sticky-shadow-right whitespace-nowrap">
+                        {matrixViewMode === 'groups' ? 'ग्रुप का नाम (Ledger Group)' : 'पार्टी का नाम (Party / Ledger)'}
                       </th>
                       
                       {matrixData?.branches?.map((b: any) => (
-                        <th key={b.id} className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <th key={b.id} className="px-4 py-3 sm:py-3.5 text-right whitespace-nowrap">
                           <span className="text-slate-900">{b.name}</span>
                           <span className="block text-[10px] text-slate-400 font-normal">({b.code})</span>
                         </th>
                       ))}
 
-                      <th className="px-4 py-3.5 text-right text-slate-600">Consolidated Dr</th>
-                      <th className="px-4 py-3.5 text-right text-slate-600">Consolidated Cr</th>
-                      <th className="px-5 py-3.5 text-right font-black text-slate-900">कुल बाकी (Net Outstanding)</th>
-                      <th className="px-4 py-3.5 text-center">360° लेजर</th>
+                      <th className="px-4 py-3 sm:py-3.5 text-right text-slate-600 whitespace-nowrap">Consolidated Dr</th>
+                      <th className="px-4 py-3 sm:py-3.5 text-right text-slate-600 whitespace-nowrap">Consolidated Cr</th>
+                      <th className="px-4 sm:px-5 py-3 sm:py-3.5 text-right font-black text-slate-900 whitespace-nowrap">कुल बाकी (Net)</th>
+                      <th className="px-3 py-3 sm:py-3.5 text-center whitespace-nowrap">360° लेजर</th>
                     </tr>
                   </thead>
 
@@ -1057,14 +1090,14 @@ export default function Dashboard() {
                             <tr
                               key={g.groupName}
                               onClick={() => setSelectedGroupModal(g.groupName)}
-                              className="hover:bg-amber-50/40 cursor-pointer transition bg-amber-50/10"
+                              className="group hover:bg-amber-50/40 cursor-pointer transition bg-amber-50/10"
                             >
-                              <td className="px-5 py-3 text-slate-900 font-bold max-w-xs">
+                              <td className="px-3.5 sm:px-5 py-2.5 sm:py-3 text-slate-900 font-bold sticky left-0 z-10 bg-white group-hover:bg-amber-50 sticky-shadow-right max-w-[190px] sm:max-w-xs">
                                 <div className="space-y-1">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-extrabold text-indigo-900 text-sm">📁 {g.groupName}</span>
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                      {g.parties?.length || 0} Accounts
+                                  <div className="flex items-center space-x-1.5 sm:space-x-2">
+                                    <span className="font-extrabold text-indigo-900 text-xs sm:text-sm truncate">📁 {g.groupName}</span>
+                                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                                      {g.parties?.length || 0}
                                     </span>
                                   </div>
                                   <div className="text-[10px] text-slate-500 truncate" title={g.parties?.join(', ')}>
@@ -1077,13 +1110,13 @@ export default function Dashboard() {
                                 const bInfo = g.branchBalances?.[b.id];
                                 if (!bInfo || bInfo.net === 0) {
                                   return (
-                                    <td key={b.id} className="px-4 py-3 text-right text-slate-300 font-mono">
+                                    <td key={b.id} className="px-4 py-2.5 sm:py-3 text-right text-slate-300 font-mono">
                                       -
                                     </td>
                                   );
                                 }
                                 return (
-                                  <td key={b.id} className="px-4 py-3 text-right whitespace-nowrap">
+                                  <td key={b.id} className="px-4 py-2.5 sm:py-3 text-right whitespace-nowrap">
                                     <span className={`font-bold font-mono ${
                                       bInfo.status === 'Dr' ? 'text-amber-700' : bInfo.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
                                     }`}>
@@ -1098,41 +1131,41 @@ export default function Dashboard() {
                                 );
                               })}
 
-                              <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                              <td className="px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                                 {g.totalDebit > 0 ? formatCurrency(g.totalDebit) : '-'}
                               </td>
 
-                              <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                              <td className="px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                                 {g.totalCredit > 0 ? formatCurrency(g.totalCredit) : '-'}
                               </td>
 
-                              <td className="px-5 py-3 text-right whitespace-nowrap">
-                                <span className={`font-black text-sm font-mono ${
+                              <td className="px-4 sm:px-5 py-2.5 sm:py-3 text-right whitespace-nowrap">
+                                <span className={`font-black text-xs sm:text-sm font-mono ${
                                   g.status === 'Dr' ? 'text-amber-700' : g.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
                                 }`}>
                                   {formatCurrency(Math.abs(g.netBalance))}
                                 </span>
-                                <span className={`px-2 py-0.5 ml-2 text-[10px] font-bold rounded-full ${
+                                <span className={`px-1.5 sm:px-2 py-0.5 ml-1.5 text-[9px] sm:text-[10px] font-bold rounded-full ${
                                   g.status === 'Dr'
                                     ? 'bg-amber-100 text-amber-800'
                                     : g.status === 'Cr'
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : 'bg-slate-100 text-slate-600'
                                 }`}>
-                                  {g.status === 'Dr' ? 'लेना है (Dr)' : g.status === 'Cr' ? 'देना है (Cr)' : 'NIL'}
+                                  {g.status === 'Dr' ? 'Dr' : g.status === 'Cr' ? 'Cr' : 'NIL'}
                                 </span>
                               </td>
 
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-3 py-2.5 sm:py-3 text-center whitespace-nowrap">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedGroupModal(g.groupName);
                                   }}
-                                  className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-bold transition shadow-2xs"
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-bold transition active:scale-95"
                                 >
                                   <Boxes className="w-3.5 h-3.5" />
-                                  <span>Group Ledger</span>
+                                  <span>Ledger</span>
                                 </button>
                               </td>
                             </tr>
@@ -1155,26 +1188,26 @@ export default function Dashboard() {
                       <tr
                         key={p.partyName}
                         onClick={() => setSelectedParty(p.partyName)}
-                        className="hover:bg-indigo-50/40 cursor-pointer transition"
+                        className="group hover:bg-indigo-50/40 cursor-pointer transition"
                       >
-                        <td className="px-5 py-3 text-slate-900 font-semibold max-w-xs">
+                        <td className="px-3.5 sm:px-5 py-2.5 sm:py-3 text-slate-900 font-semibold sticky left-0 z-10 bg-white group-hover:bg-indigo-50 sticky-shadow-right max-w-[190px] sm:max-w-xs">
                           <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="truncate font-bold">{p.partyName}</span>
+                            <div className="flex items-center space-x-1.5 sm:space-x-2">
+                              <span className="truncate font-bold text-xs sm:text-sm">{p.partyName}</span>
                               {p.isMultiBranch && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                                  {p.branchesCount} Branches
+                                <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
+                                  {p.branchesCount} Br
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center space-x-1.5 flex-wrap gap-1">
                               {p.isGrouped && p.groupName && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
                                   📁 {p.groupName}
                                 </span>
                               )}
                               {p.isBranchAccount && p.mappedBranchCode && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200 font-mono">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200 font-mono">
                                   🏷️ {p.mappedBranchCode}
                                 </span>
                               )}
@@ -1186,13 +1219,13 @@ export default function Dashboard() {
                           const bInfo = p.branchBalances[b.id];
                           if (!bInfo || bInfo.net === 0) {
                             return (
-                              <td key={b.id} className="px-4 py-3 text-right text-slate-300 font-mono">
+                              <td key={b.id} className="px-4 py-2.5 sm:py-3 text-right text-slate-300 font-mono">
                                 -
                               </td>
                             );
                           }
                           return (
-                            <td key={b.id} className="px-4 py-3 text-right whitespace-nowrap">
+                            <td key={b.id} className="px-4 py-2.5 sm:py-3 text-right whitespace-nowrap">
                               <span className={`font-bold font-mono ${
                                 bInfo.status === 'Dr' ? 'text-amber-700' : bInfo.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
                               }`}>
@@ -1207,41 +1240,41 @@ export default function Dashboard() {
                           );
                         })}
 
-                        <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                        <td className="px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                           {p.totalDebit > 0 ? formatCurrency(p.totalDebit) : '-'}
                         </td>
 
-                        <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                        <td className="px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                           {p.totalCredit > 0 ? formatCurrency(p.totalCredit) : '-'}
                         </td>
 
-                        <td className="px-5 py-3 text-right whitespace-nowrap">
-                          <span className={`font-black text-sm font-mono ${
+                        <td className="px-4 sm:px-5 py-2.5 sm:py-3 text-right whitespace-nowrap">
+                          <span className={`font-black text-xs sm:text-sm font-mono ${
                             p.status === 'Dr' ? 'text-amber-700' : p.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'
                           }`}>
                             {formatCurrency(Math.abs(p.netBalance))}
                           </span>
-                          <span className={`px-2 py-0.5 ml-2 text-[10px] font-bold rounded-full ${
+                          <span className={`px-1.5 sm:px-2 py-0.5 ml-1.5 text-[9px] sm:text-[10px] font-bold rounded-full ${
                             p.status === 'Dr'
                               ? 'bg-amber-100 text-amber-800'
                               : p.status === 'Cr'
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {p.status === 'Dr' ? 'लेना है (Dr)' : p.status === 'Cr' ? 'देना है (Cr)' : 'NIL'}
+                            {p.status === 'Dr' ? 'Dr' : p.status === 'Cr' ? 'Cr' : 'NIL'}
                           </span>
                         </td>
 
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-2.5 sm:py-3 text-center whitespace-nowrap">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedParty(p.partyName);
                             }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition"
+                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition active:scale-95"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>T-Ledger</span>
+                            <span>360° लेजर</span>
                           </button>
                         </td>
                       </tr>
@@ -1256,13 +1289,13 @@ export default function Dashboard() {
 
         {/* ==================== TAB 2: DECLARE LEDGERS AS BRANCH (BY CODE) ==================== */}
         {companies.length > 0 && activeTab === 'declare' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
               <div>
                 <div className="flex items-center space-x-2">
-                  <Tag className="w-5 h-5 text-purple-600" />
-                  <h2 className="text-lg font-bold text-slate-900">
+                  <Tag className="w-5 h-5 text-purple-600 shrink-0" />
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
                     लेजर को ब्रांच डिक्लेयर करें (Declare Ledgers as Branch by Code)
                   </h2>
                 </div>
@@ -1272,10 +1305,10 @@ export default function Dashboard() {
               </div>
 
               {availableDeclaredCodes.length > 0 && (
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-xs text-slate-500 font-semibold">Declared Codes:</span>
+                <div className="flex items-center space-x-1.5 overflow-x-auto touch-scroll no-scrollbar py-0.5">
+                  <span className="text-[11px] sm:text-xs text-slate-500 font-semibold shrink-0">Declared Codes:</span>
                   {availableDeclaredCodes.map(code => (
-                    <span key={code} className="px-2.5 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-bold font-mono">
+                    <span key={code} className="px-2 sm:px-2.5 py-0.5 bg-purple-100 text-purple-800 rounded-full text-[11px] sm:text-xs font-bold font-mono shrink-0">
                       🏷️ {code}
                     </span>
                   ))}
@@ -1283,29 +1316,29 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center space-x-3 flex-wrap gap-2">
+            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
                 <span className="text-xs font-bold text-slate-700">
                   चयनित लेजर: <b className="text-purple-700">{declareSelectedNames.length}</b>
                 </span>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 w-full sm:w-auto">
                   <input
                     type="text"
-                    placeholder="Branch Code दर्ज करें (उदा. BHW, JOG, DEL)"
+                    placeholder="Branch Code (उदा. BHW, JOG)"
                     value={assignBranchCode}
                     onChange={(e) => setAssignBranchCode(e.target.value)}
-                    className="bg-white border border-purple-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-purple-500 w-56 font-mono"
+                    className="bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-purple-500 w-full sm:w-56 font-mono"
                   />
 
                   {branches.length > 0 && (
-                    <div className="hidden sm:flex items-center space-x-1">
+                    <div className="hidden sm:flex items-center space-x-1 shrink-0">
                       <span className="text-[10px] text-slate-400">Quick:</span>
                       {branches.map(b => (
                         <button
                           key={b.id}
                           onClick={() => setAssignBranchCode(b.code)}
-                          className="px-2 py-0.5 bg-white hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold text-purple-700 font-mono"
+                          className="px-2 py-0.5 bg-white hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold text-purple-700 font-mono active:scale-95"
                         >
                           {b.code}
                         </button>
@@ -1317,44 +1350,44 @@ export default function Dashboard() {
                 <button
                   disabled={declareSelectedNames.length === 0 || !assignBranchCode.trim()}
                   onClick={handleAssignBranchCode}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold shadow transition flex items-center space-x-1.5 ${
+                  className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold shadow transition flex items-center justify-center space-x-1.5 active:scale-95 ${
                     declareSelectedNames.length === 0 || !assignBranchCode.trim()
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                       : 'bg-purple-600 hover:bg-purple-500 text-white'
                   }`}
                 >
                   <Tag className="w-3.5 h-3.5" />
-                  <span>ब्रांच कोड लागू करें (Apply Branch Code)</span>
+                  <span>ब्रांच कोड लागू करें</span>
                 </button>
               </div>
 
               <button
                 onClick={() => setActiveTab('interbranch')}
-                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 transition flex items-center space-x-1.5"
+                className="w-full sm:w-auto px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 transition flex items-center justify-center space-x-1.5 active:scale-95 shrink-0"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
                 <span>आपसी बैलेंस मैच देखें →</span>
               </button>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
-                <Search className="w-4 h-4 text-slate-400" />
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
                 <input
                   type="text"
-                  placeholder="लेजर का नाम फ़िल्टर करें (Filter ledger by name)..."
+                  placeholder="लेजर का नाम फ़िल्टर करें..."
                   value={declareSearch}
                   onChange={(e) => setDeclareSearch(e.target.value)}
                   className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
                 />
                 {declareSearch && (
-                  <button onClick={() => setDeclareSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                  <button onClick={() => setDeclareSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
                     ✕
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-between sm:justify-end space-x-2 w-full sm:w-auto">
                 <label className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
                   <input
                     type="checkbox"
@@ -1362,12 +1395,12 @@ export default function Dashboard() {
                     onChange={(e) => setDeclaredOnlyFilter(e.target.checked)}
                     className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
                   />
-                  <span>केवल डिक्लेयर्ड ब्रांच लेजर्स दिखाएं</span>
+                  <span>केवल डिक्लेयर्ड लेजर्स</span>
                 </label>
 
                 <button
                   onClick={() => fetchDeclaredLedgers(selectedCompanyId)}
-                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition active:scale-95"
                 >
                   <RefreshCw className={`w-4 h-4 ${declareLoading ? 'animate-spin text-purple-600' : ''}`} />
                 </button>
@@ -1375,12 +1408,18 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto max-h-[500px]">
+              {/* Mobile swipe hint banner */}
+              <div className="sm:hidden bg-purple-50 border-b border-purple-100 px-3 py-1.5 flex items-center justify-between text-[11px] text-purple-900 font-semibold">
+                <span>👈 लेजर विवरण व कोड देखने हेतु स्वाइप करें</span>
+                <span className="text-[10px] bg-white text-purple-700 px-2 py-0.5 rounded border border-purple-200 font-bold">Swipe 👉</span>
+              </div>
+
+              <div className="overflow-x-auto touch-scroll max-h-[500px]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
+                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0 z-20">
                     <tr>
-                      <th className="px-4 py-3 w-10 text-center">
-                        <button onClick={toggleSelectAllDeclare} className="text-slate-600 hover:text-slate-900">
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 w-10 text-center sticky left-0 z-30 bg-slate-100 sticky-shadow-right">
+                        <button onClick={toggleSelectAllDeclare} className="text-slate-600 hover:text-slate-900 p-1">
                           {declareSelectedNames.length > 0 && declareSelectedNames.length === declareLedgers.length ? (
                             <CheckSquare className="w-4 h-4 text-purple-600" />
                           ) : (
@@ -1388,13 +1427,13 @@ export default function Dashboard() {
                           )}
                         </button>
                       </th>
-                      <th className="px-4 py-3">लेजर का नाम (Ledger Name)</th>
-                      <th className="px-4 py-3">ब्रांच (Branch)</th>
-                      <th className="px-4 py-3 text-center">डिक्लेयर्ड कोड (Declared Code)</th>
-                      <th className="px-4 py-3 text-right">Debit (नाम)</th>
-                      <th className="px-4 py-3 text-right">Credit (जमा)</th>
-                      <th className="px-4 py-3 text-right font-black">Net Balance</th>
-                      <th className="px-4 py-3 text-center">Action</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">लेजर का नाम (Ledger Name)</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">ब्रांच (Branch)</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap">डिक्लेयर्ड कोड (Declared Code)</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-right whitespace-nowrap">Debit (नाम)</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-right whitespace-nowrap">Credit (जमा)</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-right font-black whitespace-nowrap">Net Balance</th>
+                      <th className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
 
@@ -1426,8 +1465,8 @@ export default function Dashboard() {
                           }`}
                           onClick={() => toggleSelectDeclare(item.partyName)}
                         >
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => toggleSelectDeclare(item.partyName)}>
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-center sticky left-0 z-10 bg-white group-hover:bg-purple-50 sticky-shadow-right" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => toggleSelectDeclare(item.partyName)} className="p-1">
                               {isSelected ? (
                                 <CheckSquare className="w-4 h-4 text-purple-600" />
                               ) : (
@@ -1436,22 +1475,22 @@ export default function Dashboard() {
                             </button>
                           </td>
 
-                          <td className="px-4 py-3 text-slate-900 font-bold">
-                            <div className="flex items-center space-x-2">
-                              <span>{item.partyName}</span>
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-900 font-bold">
+                            <div className="flex items-center space-x-1.5 sm:space-x-2">
+                              <span className="truncate max-w-[180px] sm:max-w-none">{item.partyName}</span>
                               {item.isBranchDeclared && (
-                                <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-[10px] font-bold font-mono">
+                                <span className="px-1.5 sm:px-2 py-0.5 bg-purple-600 text-white rounded text-[9px] sm:text-[10px] font-bold font-mono shrink-0">
                                   BRANCH: {item.declaredBranchCode}
                                 </span>
                               )}
                             </div>
                           </td>
 
-                          <td className="px-4 py-3 text-slate-600 font-semibold">{item.branchName}</td>
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-600 font-semibold whitespace-nowrap">{item.branchName}</td>
 
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap">
                             {item.isBranchDeclared ? (
-                              <span className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-bold font-mono text-xs">
+                              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-purple-100 text-purple-800 rounded-full font-bold font-mono text-[11px] sm:text-xs">
                                 🏷️ {item.declaredBranchCode}
                               </span>
                             ) : (
@@ -1459,15 +1498,15 @@ export default function Dashboard() {
                             )}
                           </td>
 
-                          <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                             {item.totalDebit > 0 ? formatCurrency(item.totalDebit) : '-'}
                           </td>
 
-                          <td className="px-4 py-3 text-right text-slate-600 font-mono">
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-right text-slate-600 font-mono whitespace-nowrap">
                             {item.totalCredit > 0 ? formatCurrency(item.totalCredit) : '-'}
                           </td>
 
-                          <td className="px-4 py-3 text-right whitespace-nowrap font-bold font-mono">
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-right whitespace-nowrap font-bold font-mono">
                             <span className={item.status === 'Dr' ? 'text-amber-700' : item.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'}>
                               {formatCurrency(Math.abs(item.netBalance))}
                             </span>
@@ -1478,11 +1517,11 @@ export default function Dashboard() {
                             </span>
                           </td>
 
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             {item.isBranchDeclared ? (
                               <button
                                 onClick={() => handleRemoveDeclaration(item.partyName)}
-                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-semibold border border-rose-200 transition"
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-semibold border border-rose-200 transition active:scale-95"
                               >
                                 Remove Code
                               </button>
@@ -1491,7 +1530,7 @@ export default function Dashboard() {
                                 onClick={() => {
                                   setDeclareSelectedNames([item.partyName]);
                                 }}
-                                className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-semibold border border-purple-200 transition"
+                                className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-semibold border border-purple-200 transition active:scale-95"
                               >
                                 Select
                               </button>
@@ -1510,13 +1549,13 @@ export default function Dashboard() {
 
         {/* ==================== TAB 2: LEDGER GROUPING ==================== */}
         {companies.length > 0 && activeTab === 'groups' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
               <div>
                 <div className="flex items-center space-x-2">
-                  <Boxes className="w-5 h-5 text-amber-500" />
-                  <h2 className="text-lg font-bold text-slate-900">
+                  <Boxes className="w-5 h-5 text-amber-500 shrink-0" />
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
                     लेजर ग्रुपिंग प्रबंधन (Party / Ledger Grouping)
                   </h2>
                 </div>
@@ -1528,7 +1567,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => fetchGroups(selectedCompanyId)}
-                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition active:scale-95"
                   title="Refresh Groups"
                 >
                   <RefreshCw className={`w-4 h-4 ${groupsLoading ? 'animate-spin text-amber-600' : ''}`} />
@@ -1537,23 +1576,23 @@ export default function Dashboard() {
             </div>
 
             {/* Grid: Left = Existing Groups, Right = Assign Ledgers */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
               
               {/* Left Column: Existing Groups List (5 cols) */}
               <div className="lg:col-span-5 space-y-4">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div className="flex items-center space-x-2">
                       <FolderKanban className="w-4 h-4 text-indigo-600" />
                       <h3 className="font-bold text-slate-900 text-sm">
-                        बनाए गए ग्रुप्स (Created Groups) ({groupsData.length})
+                        बनाए गए ग्रुप्स ({groupsData.length})
                       </h3>
                     </div>
                     <span className="text-[11px] font-bold text-slate-400">Total Groups</span>
                   </div>
 
                   {groupsData.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 space-y-2">
+                    <div className="py-10 text-center text-slate-400 space-y-2">
                       <Boxes className="w-10 h-10 mx-auto text-slate-300" />
                       <p className="text-xs font-semibold">अभी तक कोई ग्रुप नहीं बना है</p>
                       <p className="text-[11px] text-slate-400">
@@ -1561,25 +1600,25 @@ export default function Dashboard() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                    <div className="space-y-3 sm:space-y-4 max-h-[500px] sm:max-h-[600px] overflow-y-auto touch-scroll pr-1">
                       {groupsData.map((g: any) => (
                         <div
                           key={g.groupName}
-                          className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition space-y-3"
+                          className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition space-y-2.5 sm:space-y-3"
                         >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <span className="font-extrabold text-slate-900 text-sm">{g.groupName}</span>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                                <span className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">📁 {g.groupName}</span>
+                                <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
                                   {g.partyCount} Accounts
                                 </span>
                               </div>
-                              <span className="text-[10px] text-slate-500 font-mono">Consolidated Group Position</span>
+                              <span className="text-[10px] text-slate-500 font-mono">Consolidated Position</span>
                             </div>
 
-                            <div className="text-right">
-                              <span className={`text-xs font-black font-mono px-2 py-0.5 rounded-lg ${
+                            <div className="text-right shrink-0">
+                              <span className={`text-[11px] sm:text-xs font-black font-mono px-2 py-0.5 rounded-lg whitespace-nowrap ${
                                 g.status === 'Dr' ? 'bg-amber-100 text-amber-800' : g.status === 'Cr' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
                               }`}>
                                 {formatCurrency(Math.abs(g.netBalance))} {g.status}
@@ -1592,16 +1631,16 @@ export default function Dashboard() {
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                               शामिल खाते (Member Accounts):
                             </span>
-                            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto touch-scroll">
                               {g.parties.map((p: any) => (
                                 <span
                                   key={p.partyName}
                                   className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-medium text-slate-800 shadow-2xs"
                                 >
-                                  <span>{p.partyName}</span>
+                                  <span className="truncate max-w-[140px] sm:max-w-none">{p.partyName}</span>
                                   <button
                                     onClick={() => handleRemovePartyFromGroup(p.partyName)}
-                                    className="text-slate-400 hover:text-rose-600 transition ml-1"
+                                    className="text-slate-400 hover:text-rose-600 transition ml-1 p-0.5"
                                     title="ग्रुप से निकालें"
                                   >
                                     ✕
@@ -1615,17 +1654,17 @@ export default function Dashboard() {
                           <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
                             <button
                               onClick={() => setSelectedGroupModal(g.groupName)}
-                              className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 font-bold text-xs transition"
+                              className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 font-bold text-xs transition active:scale-95"
                             >
                               <FileText className="w-3.5 h-3.5" />
-                              <span>संयुक्त लेजर देखें (Combined Ledger) →</span>
+                              <span>संयुक्त लेजर देखें →</span>
                             </button>
 
                             <button
                               onClick={() => handleDeleteGroup(g.groupName)}
-                              className="text-rose-600 hover:text-rose-800 text-[11px] font-semibold transition"
+                              className="text-rose-600 hover:text-rose-800 text-[11px] font-semibold transition p-1"
                             >
-                              ग्रुप हटाएं (Delete)
+                              ग्रुप हटाएं
                             </button>
                           </div>
                         </div>
@@ -1637,16 +1676,16 @@ export default function Dashboard() {
 
               {/* Right Column: Select & Assign Ledgers (7 cols) */}
               <div className="lg:col-span-7 space-y-4">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div className="flex items-center space-x-2">
                       <Users2 className="w-4 h-4 text-purple-600" />
                       <h3 className="font-bold text-slate-900 text-sm">
-                        लेजर्स चुनें और ग्रुप में जोड़ें (Assign Ledgers to Group)
+                        लेजर्स चुनें और ग्रुप में जोड़ें
                       </h3>
                     </div>
                     {groupSelectedParties.length > 0 && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
                         {groupSelectedParties.length} Selected
                       </span>
                     )}
@@ -1657,7 +1696,7 @@ export default function Dashboard() {
                     <span className="text-[11px] font-bold text-purple-900 block">
                       चयनित लेजर्स को ग्रुप असाइन करें:
                     </span>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
                         placeholder="नया ग्रुप नाम (उदा. Group A)..."
@@ -1666,7 +1705,7 @@ export default function Dashboard() {
                           setNewGroupNameInput(e.target.value);
                           if (e.target.value) setExistingGroupSelect('');
                         }}
-                        className="flex-1 bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 min-w-[160px]"
+                        className="flex-1 bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 w-full"
                       />
 
                       {groupNamesList.length > 0 && (
@@ -1676,7 +1715,7 @@ export default function Dashboard() {
                             setExistingGroupSelect(e.target.value);
                             if (e.target.value) setNewGroupNameInput('');
                           }}
-                          className="bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 w-full sm:w-auto"
                         >
                           <option value="">-- या मौजूदा ग्रुप चुनें --</option>
                           {groupNamesList.map((gn) => (
@@ -1688,7 +1727,7 @@ export default function Dashboard() {
                       <button
                         onClick={handleAssignGroup}
                         disabled={groupSelectedParties.length === 0 || (!newGroupNameInput.trim() && !existingGroupSelect.trim())}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-sm transition whitespace-nowrap"
+                        className="w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-sm transition whitespace-nowrap active:scale-95"
                       >
                         ग्रुप असाइन करें ({groupSelectedParties.length})
                       </button>
@@ -1697,25 +1736,25 @@ export default function Dashboard() {
 
                   {/* Search Bar */}
                   <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2">
-                    <Search className="w-4 h-4 text-slate-400" />
+                    <Search className="w-4 h-4 text-slate-400 shrink-0" />
                     <input
                       type="text"
-                      placeholder="पार्टी का नाम खोजें (उदा. Amol, Bansal, Utrakshi)..."
+                      placeholder="पार्टी का नाम खोजें (उदा. Amol, Bansal)..."
                       value={groupSearch}
                       onChange={(e) => setGroupSearch(e.target.value)}
                       className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
                     />
                     {groupSearch && (
-                      <button onClick={() => setGroupSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                      <button onClick={() => setGroupSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
                         ✕
                       </button>
                     )}
                   </div>
 
                   {/* Party Selection Table */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[440px] overflow-y-auto">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[380px] sm:max-h-[440px] overflow-y-auto touch-scroll">
                     <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] sticky top-0 border-b border-slate-200">
+                      <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] sticky top-0 z-20 border-b border-slate-200">
                         <tr>
                           <th className="px-3 py-2.5 text-center w-10">
                             <input
@@ -1728,12 +1767,12 @@ export default function Dashboard() {
                                   setGroupSelectedParties(groupParties.map(p => p.partyName));
                                 }
                               }}
-                              className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer p-1"
                             />
                           </th>
-                          <th className="px-3 py-2.5">पार्टी का नाम (Party Name)</th>
-                          <th className="px-3 py-2.5">मौजूदा ग्रुप (Current Group)</th>
-                          <th className="px-3 py-2.5 text-right">Net Balance</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">पार्टी का नाम</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">मौजूदा ग्रुप</th>
+                          <th className="px-3 py-2.5 text-right whitespace-nowrap">Net Balance</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
@@ -1775,9 +1814,9 @@ export default function Dashboard() {
                                   />
                                 </td>
                                 <td className="px-3 py-2 font-bold text-slate-900">
-                                  {p.partyName}
+                                  <span className="truncate max-w-[170px] sm:max-w-none block">{p.partyName}</span>
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-2 whitespace-nowrap">
                                   {p.isGrouped && p.groupName ? (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                                       📁 {p.groupName}
@@ -1786,7 +1825,7 @@ export default function Dashboard() {
                                     <span className="text-slate-400 italic text-[11px]">Ungrouped</span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2 text-right font-mono font-bold">
+                                <td className="px-3 py-2 text-right font-mono font-bold whitespace-nowrap">
                                   <span className={p.status === 'Dr' ? 'text-amber-700' : p.status === 'Cr' ? 'text-emerald-700' : 'text-slate-500'}>
                                     {formatCurrency(Math.abs(p.netBalance))}
                                   </span>
@@ -1814,54 +1853,54 @@ export default function Dashboard() {
 
         {/* ==================== TAB 3: INTER-BRANCH TWO-WAY RECONCILIATION & MISMATCHES ==================== */}
         {companies.length > 0 && activeTab === 'interbranch' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
             {/* Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
               <div>
                 <div className="flex items-center space-x-2">
-                  <ArrowRightLeft className="w-5 h-5 text-cyan-600" />
-                  <h2 className="text-lg font-bold text-slate-900">
-                    आपसी कंपनी/ब्रांच मिलान व मिसमैच (Cross-Entity Reconciliation & Mismatches)
+                  <ArrowRightLeft className="w-5 h-5 text-cyan-600 shrink-0" />
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    आपसी कंपनी/ब्रांच मिलान व मिसमैच (Cross-Entity Reconciliation)
                   </h2>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  स्पेलिंग भिन्नता की समस्या को दूर करने के लिए एंटिटी कोड (Entity Code) के आधार पर दोनों किताबों का दो-तरफा मिलान किया जाता है। मैच हुई एंट्रियां हटाकर सिर्फ मिसमैच एंट्रियां दिखाई जाती हैं।
+                  स्पेलिंग भिन्नता की समस्या को दूर करने के लिए एंटिटी कोड (Entity Code) के आधार पर दोनों किताबों का दो-तरफा मिलान किया जाता है।
                 </p>
               </div>
 
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setActiveTab('declare')}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition"
+                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition active:scale-95"
                 >
                   <Tag className="w-3.5 h-3.5" />
-                  <span>लेजर को कोड मैप करें</span>
+                  <span>कोड मैप करें</span>
                 </button>
 
                 <button
                   onClick={fetchInterBranch}
-                  className="inline-flex items-center space-x-1 px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700"
+                  className="inline-flex items-center space-x-1 px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 active:scale-95 transition"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${ibLoading ? 'animate-spin text-cyan-600' : ''}`} />
-                  <span>Re-check Matching</span>
+                  <span>Re-check</span>
                 </button>
               </div>
             </div>
 
             {/* Branch Selection Bar with Entity Codes */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
                 
                 {/* Branch 1 Card */}
-                <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center space-x-1.5">
                       <Building2 className="w-4 h-4 text-blue-600" />
                       <span>First Entity / Branch (बुक 1)</span>
                     </label>
                     {ibData?.selected?.branch1?.code && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white font-mono shadow-xs">
+                      <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-blue-600 text-white font-mono shadow-xs">
                         CODE: {ibData.selected.branch1.code}
                       </span>
                     )}
@@ -1869,7 +1908,7 @@ export default function Dashboard() {
                   <select
                     value={ibBranch1}
                     onChange={(e) => setIbBranch1(e.target.value)}
-                    className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1893,14 +1932,14 @@ export default function Dashboard() {
                 </div>
 
                 {/* Branch 2 Card */}
-                <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center space-x-1.5">
                       <Building2 className="w-4 h-4 text-purple-600" />
                       <span>Second Entity / Branch (बुक 2)</span>
                     </label>
                     {ibData?.selected?.branch2?.code && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-600 text-white font-mono shadow-xs">
+                      <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-purple-600 text-white font-mono shadow-xs">
                         CODE: {ibData.selected.branch2.code}
                       </span>
                     )}
@@ -1908,7 +1947,7 @@ export default function Dashboard() {
                   <select
                     value={ibBranch2}
                     onChange={(e) => setIbBranch2(e.target.value)}
-                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1936,95 +1975,95 @@ export default function Dashboard() {
 
             {/* Reconciliation KPI Summary Cards */}
             {ibData?.summary && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
                 
                 {/* Total Mismatches Card */}
-                <div className="bg-white border-2 border-rose-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3 bg-rose-50/30">
-                  <div className="p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
-                    <AlertTriangle className="w-6 h-6" />
+                <div className="bg-white border-2 border-rose-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3 bg-rose-50/30">
+                  <div className="p-2 sm:p-3 bg-rose-100 rounded-xl text-rose-600 shrink-0">
+                    <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider">
-                      कुल मिसमैच (Mismatches)
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-[10px] font-extrabold text-rose-700 uppercase tracking-wider truncate">
+                      कुल मिसमैच
                     </div>
-                    <div className="text-xl font-black text-rose-700 mt-0.5">
+                    <div className="text-base sm:text-xl font-black text-rose-700 mt-0.5 truncate">
                       {ibData.summary.totalMismatches} Entries
                     </div>
-                    <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
+                    <span className="text-[10px] text-rose-600 font-bold block mt-0.5 truncate">
                       Diff: {formatCurrency(ibData.summary.missingInB2Amount + ibData.summary.missingInB1Amount)}
                     </span>
                   </div>
                 </div>
 
                 {/* Missing in B2 Card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                  <div className="p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
-                    <ArrowDownRight className="w-6 h-6" />
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                  <div className="p-2 sm:p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+                    <ArrowDownRight className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      बुक 2 में गायब (Missing in B2)
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider truncate">
+                      बुक 2 में गायब
                     </div>
-                    <div className="text-lg font-black text-amber-700 mt-0.5">
+                    <div className="text-base sm:text-lg font-black text-amber-700 mt-0.5 truncate">
                       {ibData.summary.missingInB2Count} Entries
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5 truncate">
                       {formatCurrency(ibData.summary.missingInB2Amount)}
                     </span>
                   </div>
                 </div>
 
                 {/* Missing in B1 Card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                  <div className="p-3 bg-purple-50 rounded-xl text-purple-600 shrink-0">
-                    <ArrowUpRight className="w-6 h-6" />
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                  <div className="p-2 sm:p-3 bg-purple-50 rounded-xl text-purple-600 shrink-0">
+                    <ArrowUpRight className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      बुक 1 में गायब (Missing in B1)
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider truncate">
+                      बुक 1 में गायब
                     </div>
-                    <div className="text-lg font-black text-purple-700 mt-0.5">
+                    <div className="text-base sm:text-lg font-black text-purple-700 mt-0.5 truncate">
                       {ibData.summary.missingInB1Count} Entries
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5 truncate">
                       {formatCurrency(ibData.summary.missingInB1Amount)}
                     </span>
                   </div>
                 </div>
 
                 {/* Matched Count Card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                  <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
-                    <CheckCircle2 className="w-6 h-6" />
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                  <div className="p-2 sm:p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider truncate">
                       पूर्ण मिलान (Matched)
                     </div>
-                    <div className="text-lg font-black text-emerald-700 mt-0.5">
+                    <div className="text-base sm:text-lg font-black text-emerald-700 mt-0.5 truncate">
                       {ibData.summary.matchedCount} Pairs
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5 truncate">
                       {formatCurrency(ibData.summary.matchedAmount)}
                     </span>
                   </div>
                 </div>
 
                 {/* Net Difference Card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-                  <div className="p-3 bg-slate-100 rounded-xl text-slate-700 shrink-0">
-                    <Scale className="w-6 h-6" />
+                <div className="col-span-2 sm:col-span-1 bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center space-x-2.5 sm:space-x-3">
+                  <div className="p-2 sm:p-3 bg-slate-100 rounded-xl text-slate-700 shrink-0">
+                    <Scale className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider truncate">
                       नेट अंतर (Net Diff)
                     </div>
-                    <div className={`text-lg font-black mt-0.5 ${
+                    <div className={`text-base sm:text-lg font-black mt-0.5 truncate font-mono ${
                       ibData.summary.isReconciled ? 'text-emerald-700' : 'text-rose-700'
                     }`}>
                       {formatCurrency(ibData.summary.difference)}
                     </div>
-                    <span className={`text-[10px] font-bold block mt-0.5 ${
+                    <span className={`text-[10px] font-bold block mt-0.5 truncate ${
                       ibData.summary.isReconciled ? 'text-emerald-600' : 'text-rose-600'
                     }`}>
                       {ibData.summary.isReconciled ? '✓ Fully Reconciled' : 'Discrepancy Exists'}
@@ -2036,23 +2075,23 @@ export default function Dashboard() {
             )}
 
             {/* Filter and Mismatch Toggle Bar */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
                 
                 {/* Status Toggle: Default is 'mismatch_only' as requested! */}
-                <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                  <span className="text-slate-500 text-[11px] uppercase px-2">दृश्य मोड:</span>
+                <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold overflow-x-auto touch-scroll no-scrollbar">
+                  <span className="text-slate-500 text-[10px] sm:text-[11px] uppercase px-1.5 shrink-0">मोड:</span>
                   
                   <button
                     onClick={() => setIbStatusFilter('mismatch_only')}
-                    className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1.5 ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shrink-0 active:scale-95 ${
                       ibStatusFilter === 'mismatch_only'
                         ? 'bg-rose-600 text-white shadow-sm'
                         : 'text-slate-700 hover:text-slate-900'
                     }`}
                   >
                     <FilterX className="w-3.5 h-3.5" />
-                    <span>केवल मिसमैच (Only Mismatches - मैच हटाकर)</span>
+                    <span>केवल मिसमैच</span>
                     {ibData?.summary?.totalMismatches > 0 && (
                       <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                         ibStatusFilter === 'mismatch_only' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
@@ -2064,40 +2103,40 @@ export default function Dashboard() {
 
                   <button
                     onClick={() => setIbStatusFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg transition ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition shrink-0 active:scale-95 ${
                       ibStatusFilter === 'all'
                         ? 'bg-slate-800 text-white shadow-sm'
                         : 'text-slate-700 hover:text-slate-900'
                     }`}
                   >
-                    <span>सभी प्रविष्टियां (All {ibData?.filters?.totalAllRows || ''})</span>
+                    <span>सभी ({ibData?.filters?.totalAllRows || ''})</span>
                   </button>
 
                   <button
                     onClick={() => setIbStatusFilter('matched_only')}
-                    className={`px-3 py-1.5 rounded-lg transition flex items-center space-x-1 ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shrink-0 active:scale-95 ${
                       ibStatusFilter === 'matched_only'
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-slate-700 hover:text-slate-900'
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>केवल मैच हुई (Matched {ibData?.summary?.matchedCount || 0})</span>
+                    <span>मैच हुई ({ibData?.summary?.matchedCount || 0})</span>
                   </button>
                 </div>
 
                 {/* Search Bar */}
                 <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 w-full sm:w-64">
-                  <Search className="w-3.5 h-3.5 text-slate-400" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <input
                     type="text"
-                    placeholder="वाउचर नं, तारीख या राशि खोजें..."
+                    placeholder="वाउचर नं, तारीख या राशि..."
                     value={ibSearch}
                     onChange={(e) => setIbSearch(e.target.value)}
                     className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
                   />
                   {ibSearch && (
-                    <button onClick={() => setIbSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                    <button onClick={() => setIbSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
                       ✕
                     </button>
                   )}
@@ -2106,12 +2145,12 @@ export default function Dashboard() {
               </div>
 
               {/* Category Pills (Payment vs Sale vs Journal) */}
-              <div className="flex items-center space-x-2 pt-2 border-t border-slate-100 text-xs font-semibold overflow-x-auto">
-                <span className="text-slate-400 text-[11px] uppercase mr-1">श्रेणी (Category):</span>
+              <div className="flex items-center space-x-1.5 pt-2 border-t border-slate-100 text-xs font-semibold overflow-x-auto touch-scroll no-scrollbar py-0.5">
+                <span className="text-slate-400 text-[10px] sm:text-[11px] uppercase mr-1 shrink-0">श्रेणी:</span>
                 
                 <button
                   onClick={() => setIbTypeFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg transition ${
+                  className={`px-2.5 py-1 rounded-lg transition shrink-0 active:scale-95 ${
                     ibTypeFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -2120,11 +2159,11 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => setIbTypeFilter('payment_receipt')}
-                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 ${
+                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 shrink-0 active:scale-95 ${
                     ibTypeFilter === 'payment_receipt' ? 'bg-blue-600 text-white font-bold' : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
                   }`}
                 >
-                  <span>Payment ↔ Receipt (भुगतान व प्राप्ति)</span>
+                  <span>Payment ↔ Receipt</span>
                   {ibData?.summary?.categories?.paymentReceipt?.mismatchCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] px-1 py-0.2 rounded-full font-mono ml-1">
                       {ibData.summary.categories.paymentReceipt.mismatchCount} Diff
@@ -2134,11 +2173,11 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => setIbTypeFilter('sale_purchase')}
-                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 ${
+                  className={`px-2.5 py-1 rounded-lg transition flex items-center space-x-1 shrink-0 active:scale-95 ${
                     ibTypeFilter === 'sale_purchase' ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                   }`}
                 >
-                  <span>Sale ↔ Purchase (बिक्री व खरीद)</span>
+                  <span>Sale ↔ Purchase</span>
                   {ibData?.summary?.categories?.salePurchase?.mismatchCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] px-1 py-0.2 rounded-full font-mono ml-1">
                       {ibData.summary.categories.salePurchase.mismatchCount} Diff
@@ -2148,7 +2187,7 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => setIbTypeFilter('journal_other')}
-                  className={`px-2.5 py-1 rounded-lg transition ${
+                  className={`px-2.5 py-1 rounded-lg transition shrink-0 active:scale-95 ${
                     ibTypeFilter === 'journal_other' ? 'bg-purple-600 text-white font-bold' : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
                   }`}
                 >
@@ -2159,55 +2198,63 @@ export default function Dashboard() {
 
             {/* Side-by-Side Unified Line-by-Line Comparison Table */}
             <div className="bg-white border-2 border-slate-300 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-5 py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+              <div className="px-3.5 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <div className="font-bold text-xs tracking-wide flex items-center space-x-2">
-                  <GitCompare className="w-4 h-4 text-cyan-400" />
-                  <span>दो-तरफा वाउचर मिलान तालिका (Two-Way Reconciliation Table)</span>
+                  <GitCompare className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="truncate">दो-तरफा वाउचर मिलान तालिका</span>
                 </div>
-                <div className="text-xs text-slate-300 font-mono">
-                  दिखाई जा रही प्रविष्टियां: <b className="text-white">{ibData?.rows?.length || 0}</b>
+                <div className="text-[11px] sm:text-xs text-slate-300 font-mono">
+                  प्रविष्टियां: <b className="text-white">{ibData?.rows?.length || 0}</b>
                   {ibStatusFilter === 'mismatch_only' && <span className="text-amber-300 ml-1.5">(केवल मिसमैच)</span>}
                 </div>
               </div>
 
-              <div className="overflow-x-auto max-h-[580px]">
+              {/* Mobile swipe hint banner */}
+              <div className="sm:hidden bg-cyan-50 border-b border-cyan-100 px-3 py-1.5 flex items-center justify-between text-[11px] text-cyan-950 font-semibold">
+                <span>👈 दोनों किताबों का मिलान देखने हेतु स्वाइप करें</span>
+                <span className="text-[10px] bg-white text-cyan-800 px-2 py-0.5 rounded border border-cyan-200 font-bold">Swipe 👉</span>
+              </div>
+
+              <div className="overflow-x-auto touch-scroll max-h-[580px]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px] border-b-2 border-slate-300 sticky top-0 shadow-sm">
+                  <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px] border-b-2 border-slate-300 sticky top-0 shadow-sm z-20">
                     <tr>
-                      <th className="px-3 py-3 text-center border-r border-slate-200">स्थिति (Status)</th>
-                      <th className="px-3 py-3 text-center border-r border-slate-200">Category</th>
+                      <th className="px-3 py-2.5 sm:py-3 text-center border-r border-slate-200 sticky left-0 z-30 bg-slate-100 sticky-shadow-right whitespace-nowrap">
+                        स्थिति (Status)
+                      </th>
+                      <th className="px-3 py-2.5 sm:py-3 text-center border-r border-slate-200 whitespace-nowrap">Category</th>
                       
                       {/* Book 1 Header Block */}
-                      <th colSpan={4} className="px-4 py-3 bg-blue-100/70 text-blue-950 border-r-2 border-indigo-300 text-center font-black">
+                      <th colSpan={4} className="px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-100/70 text-blue-950 border-r-2 border-indigo-300 text-center font-black whitespace-nowrap">
                         बुक 1: {ibData?.selected?.branch1?.name || 'Branch 1'} [{ibData?.selected?.branch1?.code}]
                       </th>
 
                       {/* Book 2 Header Block */}
-                      <th colSpan={4} className="px-4 py-3 bg-purple-100/70 text-purple-950 border-r border-slate-300 text-center font-black">
+                      <th colSpan={4} className="px-3 sm:px-4 py-2.5 sm:py-3 bg-purple-100/70 text-purple-950 border-r border-slate-300 text-center font-black whitespace-nowrap">
                         बुक 2: {ibData?.selected?.branch2?.name || 'Branch 2'} [{ibData?.selected?.branch2?.code}]
                       </th>
 
-                      <th className="px-3 py-3 text-right bg-slate-200 text-slate-900 font-black">
+                      <th className="px-3 py-2.5 sm:py-3 text-right bg-slate-200 text-slate-900 font-black whitespace-nowrap">
                         राशि (Amount)
                       </th>
                     </tr>
                     <tr className="bg-slate-50 text-[10px] text-slate-600 border-b border-slate-200">
-                      <th className="px-3 py-2 text-center border-r border-slate-200">#</th>
-                      <th className="px-3 py-2 text-center border-r border-slate-200">Type</th>
+                      <th className="px-3 py-2 text-center border-r border-slate-200 sticky left-0 z-30 bg-slate-50 sticky-shadow-right whitespace-nowrap">#</th>
+                      <th className="px-3 py-2 text-center border-r border-slate-200 whitespace-nowrap">Type</th>
                       
                       {/* B1 sub-columns */}
-                      <th className="px-3 py-2">तारीख व प्रकार</th>
-                      <th className="px-3 py-2">वाउचर नं</th>
-                      <th className="px-3 py-2 text-right bg-amber-50/50">डेबिट (नाम)</th>
-                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r-2 border-indigo-300">क्रेडिट (जमा)</th>
+                      <th className="px-3 py-2 whitespace-nowrap">तारीख व प्रकार</th>
+                      <th className="px-3 py-2 whitespace-nowrap">वाउचर नं</th>
+                      <th className="px-3 py-2 text-right bg-amber-50/50 whitespace-nowrap">डेबिट (नाम)</th>
+                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r-2 border-indigo-300 whitespace-nowrap">क्रेडिट (जमा)</th>
 
                       {/* B2 sub-columns */}
-                      <th className="px-3 py-2">तारीख व प्रकार</th>
-                      <th className="px-3 py-2">वाउचर नं</th>
-                      <th className="px-3 py-2 text-right bg-amber-50/50">डेबिट (नाम)</th>
-                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r border-slate-300">क्रेडिट (जमा)</th>
+                      <th className="px-3 py-2 whitespace-nowrap">तारीख व प्रकार</th>
+                      <th className="px-3 py-2 whitespace-nowrap">वाउचर नं</th>
+                      <th className="px-3 py-2 text-right bg-amber-50/50 whitespace-nowrap">डेबिट (नाम)</th>
+                      <th className="px-3 py-2 text-right bg-emerald-50/50 border-r border-slate-300 whitespace-nowrap">क्रेडिट (जमा)</th>
 
-                      <th className="px-3 py-2 text-right">Net Value</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">Net Value</th>
                     </tr>
                   </thead>
 
@@ -2256,7 +2303,7 @@ export default function Dashboard() {
                           }`}
                         >
                           {/* Match Status Badge */}
-                          <td className="px-3 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">
+                          <td className="px-3 py-2 sm:py-2.5 text-center border-r border-slate-200 whitespace-nowrap sticky left-0 z-10 bg-white group-hover:bg-slate-50 sticky-shadow-right">
                             {isMatched && (
                               <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 <span>🟢</span>
@@ -2266,13 +2313,13 @@ export default function Dashboard() {
                             {isMissingInB2 && (
                               <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300" title="यह एंट्री बुक 1 में दर्ज है, पर बुक 2 में नहीं मिली">
                                 <span>🔴</span>
-                                <span>MISSING IN B2</span>
+                                <span>MISSING B2</span>
                               </span>
                             )}
                             {isMissingInB1 && (
                               <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-300" title="यह एंट्री बुक 2 में दर्ज है, पर बुक 1 में नहीं मिली">
                                 <span>🔴</span>
-                                <span>MISSING IN B1</span>
+                                <span>MISSING B1</span>
                               </span>
                             )}
                           </td>
@@ -2310,12 +2357,12 @@ export default function Dashboard() {
                           </td>
 
                           {/* Book 1 Side: Debit */}
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20">
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20 whitespace-nowrap">
                             {row.b1?.debit > 0 ? formatCurrency(row.b1.debit) : '-'}
                           </td>
 
                           {/* Book 1 Side: Credit */}
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r-2 border-indigo-300">
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r-2 border-indigo-300 whitespace-nowrap">
                             {row.b1?.credit > 0 ? formatCurrency(row.b1.credit) : '-'}
                           </td>
 
@@ -2339,12 +2386,12 @@ export default function Dashboard() {
                           </td>
 
                           {/* Book 2 Side: Debit */}
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20">
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-700 bg-amber-50/20 whitespace-nowrap">
                             {row.b2?.debit > 0 ? formatCurrency(row.b2.debit) : '-'}
                           </td>
 
                           {/* Book 2 Side: Credit */}
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r border-slate-300">
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 border-r border-slate-300 whitespace-nowrap">
                             {row.b2?.credit > 0 ? formatCurrency(row.b2.credit) : '-'}
                           </td>
 
@@ -2365,13 +2412,13 @@ export default function Dashboard() {
 
         {/* ==================== TAB 4: EXCEPTIONS REPORT (IGNORED ENTRIES) ==================== */}
         {companies.length > 0 && activeTab === 'exceptions' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center space-x-2">
-                  <ShieldAlert className="w-5 h-5 text-rose-600" />
-                  <h2 className="text-lg font-bold text-slate-900">
+                  <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
                     एक्सेप्शंस रिपोर्ट (Exceptions Report - Ignored Entries)
                   </h2>
                 </div>
@@ -2380,10 +2427,11 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 self-end sm:self-auto">
                 <button
                   onClick={() => fetchExceptions(selectedCompanyId)}
-                  className="p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+                  className="p-2.5 sm:p-2 border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-600 transition active:scale-95 touch-target-min"
+                  title="रिफ्रेश करें"
                 >
                   <RefreshCw className={`w-4 h-4 ${exceptionsLoading ? 'animate-spin text-rose-600' : ''}`} />
                 </button>
@@ -2391,9 +2439,9 @@ export default function Dashboard() {
             </div>
 
             {/* Filter Search */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full md:w-80">
-                <Search className="w-4 h-4 text-slate-400" />
+            <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
                 <input
                   type="text"
                   placeholder="खोजें (Search party, voucher no, type)..."
@@ -2402,31 +2450,40 @@ export default function Dashboard() {
                   className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
                 />
                 {exceptionsSearch && (
-                  <button onClick={() => setExceptionsSearch('')} className="text-slate-400 hover:text-slate-600 text-xs">
+                  <button onClick={() => setExceptionsSearch('')} className="text-slate-400 hover:text-slate-600 text-xs p-1">
                     ✕
                   </button>
                 )}
               </div>
 
-              <div className="text-xs font-bold text-slate-600">
-                कुल एक्सेप्शंस: <span className="text-rose-600 font-mono text-sm">{exceptions.length}</span>
+              <div className="text-xs font-bold text-slate-600 flex items-center justify-between sm:justify-end gap-2">
+                <span>कुल एक्सेप्शंस:</span>
+                <span className="text-rose-700 font-mono text-xs font-extrabold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg">
+                  {exceptions.length} Entries
+                </span>
               </div>
             </div>
 
             {/* Exceptions Table */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto max-h-[500px]">
+            <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden shadow-sm">
+              {/* Mobile Swipe Hint Banner */}
+              <div className="sm:hidden bg-rose-50 border-b border-rose-100 px-3 py-1.5 flex items-center justify-between text-[11px] text-rose-900 font-semibold">
+                <span>👈 एक्सेप्शन एंट्रियां देखने हेतु स्वाइप करें</span>
+                <span className="text-[10px] bg-white text-rose-700 px-2 py-0.5 rounded border border-rose-200 font-bold">Swipe 👉</span>
+              </div>
+
+              <div className="overflow-x-auto touch-scroll max-h-[500px]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0">
+                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 sticky top-0 z-20">
                     <tr>
-                      <th className="px-4 py-3">Date (तारीख)</th>
-                      <th className="px-4 py-3">Branch (ब्रांच)</th>
-                      <th className="px-4 py-3">Type & Voucher No</th>
-                      <th className="px-4 py-3">पार्टी का नाम (Party Name)</th>
-                      <th className="px-4 py-3">काउंटर खाता (Counter Account)</th>
-                      <th className="px-4 py-3 text-right">राशि (Amount)</th>
-                      <th className="px-4 py-3">इग्नोर कारण (Reason)</th>
-                      <th className="px-4 py-3 text-center">Action</th>
+                      <th className="px-3 sm:px-4 py-3 sticky left-0 z-20 bg-slate-100 sticky-shadow-right whitespace-nowrap">Date (तारीख)</th>
+                      <th className="px-3 sm:px-4 py-3 whitespace-nowrap">Branch (ब्रांच)</th>
+                      <th className="px-3 sm:px-4 py-3 whitespace-nowrap">Type & Voucher No</th>
+                      <th className="px-3 sm:px-4 py-3 min-w-[140px]">पार्टी का नाम (Party Name)</th>
+                      <th className="px-3 sm:px-4 py-3 min-w-[130px]">काउंटर खाता (Counter Account)</th>
+                      <th className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">राशि (Amount)</th>
+                      <th className="px-3 sm:px-4 py-3 min-w-[140px]">इग्नोर कारण (Reason)</th>
+                      <th className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
 
@@ -2452,31 +2509,33 @@ export default function Dashboard() {
 
                     {!exceptionsLoading && exceptions.map((item) => (
                       <tr key={item.id} className="hover:bg-rose-50/40 transition">
-                        <td className="px-4 py-3 whitespace-nowrap text-slate-600 font-mono">{item.dateStr}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-slate-600 font-mono sticky left-0 z-10 bg-white sticky-shadow-right">
+                          {item.dateStr}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                           <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">
                             {item.branchName}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mr-1">
                             {item.voucherType}
                           </span>
                           <span className="font-mono text-slate-700 font-semibold">{item.voucherNo}</span>
                         </td>
-                        <td className="px-4 py-3 text-slate-900 font-bold">{item.primaryParty}</td>
-                        <td className="px-4 py-3 text-slate-600">{item.counterAccount || '-'}</td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                        <td className="px-3 sm:px-4 py-3 text-slate-900 font-bold whitespace-nowrap">{item.primaryParty}</td>
+                        <td className="px-3 sm:px-4 py-3 text-slate-600 whitespace-nowrap">{item.counterAccount || '-'}</td>
+                        <td className="px-3 sm:px-4 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           {formatCurrency(item.amount)}
                         </td>
-                        <td className="px-4 py-3 text-slate-500 italic max-w-xs truncate" title={item.ignoredReason}>
+                        <td className="px-3 sm:px-4 py-3 text-slate-500 italic max-w-xs truncate" title={item.ignoredReason}>
                           {item.ignoredReason}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">
                           <button
                             disabled={restoringId === item.id}
                             onClick={() => handleRestoreEntry(item.id)}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition"
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition active:scale-95 touch-target-min"
                             title="Restore this voucher back to regular ledger"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -2495,11 +2554,11 @@ export default function Dashboard() {
 
         {/* ==================== TAB 5: BRANCHES & IMPORT ==================== */}
         {companies.length > 0 && activeTab === 'branches' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">ब्रांचेस प्रबंधन (Branch Management)</h2>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">ब्रांचेस प्रबंधन (Branch Management)</h2>
                 <p className="text-xs text-slate-500">
                   हर ब्रांच का नाम क्रिएट करें और उस ब्रांच के लिए DayBook फ़ाइल इम्पोर्ट करें
                 </p>
@@ -2507,64 +2566,64 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setShowNewBranchModal(true)}
-                className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition"
+                className="inline-flex items-center justify-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 sm:py-2 rounded-xl shadow transition active:scale-95 touch-target-min w-full sm:w-auto"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 shrink-0" />
                 <span>+ Create New Branch</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {branches.map((b) => (
                 <div
                   key={b.id}
-                  className={`bg-white border rounded-2xl p-5 shadow-sm transition ${
+                  className={`bg-white border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm transition ${
                     importBranchId === b.id ? 'border-indigo-500 ring-2 ring-indigo-400/40' : 'border-slate-200'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
                         {b.code || b.name.substring(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">{b.name}</h3>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-900 text-sm truncate">{b.name}</h3>
                         <span className="text-[10px] text-slate-400 font-mono">Code: {b.code}</span>
                       </div>
                     </div>
 
                     <button
                       onClick={() => setResetModal({ open: true, type: 'branch', id: b.id, name: b.name })}
-                      className="text-slate-400 hover:text-rose-500 p-1 rounded transition"
+                      className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition active:scale-95 shrink-0"
                       title="Clear or delete branch"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100 text-xs">
+                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
                     <div>
                       <span className="text-slate-400 block text-[11px]">Total Vouchers</span>
-                      <span className="font-bold text-slate-900 text-sm">{b.voucherCount || 0}</span>
+                      <span className="font-bold text-slate-900 text-sm font-mono">{b.voucherCount || 0}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[11px]">Parties Found</span>
-                      <span className="font-bold text-slate-900 text-sm">{b.partiesCount || 0}</span>
+                      <span className="font-bold text-slate-900 text-sm font-mono">{b.partiesCount || 0}</span>
                     </div>
                   </div>
 
                   {b.lastDate && (
                     <div className="mt-2 text-[11px] text-slate-500">
-                      Latest Voucher: <span className="font-semibold text-slate-700">{b.lastDate}</span>
+                      Latest Voucher: <span className="font-semibold text-slate-700 font-mono">{b.lastDate}</span>
                     </div>
                   )}
 
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center space-x-2">
                     <button
                       onClick={() => setImportBranchId(b.id)}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold text-center transition ${
+                      className={`flex-1 py-2 sm:py-1.5 px-3 rounded-xl text-xs font-semibold text-center transition active:scale-95 touch-target-min ${
                         importBranchId === b.id
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-indigo-600 text-white font-bold'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
@@ -2576,13 +2635,13 @@ export default function Dashboard() {
             </div>
 
             {/* DayBook Import Section */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-8">
+            <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm mt-4 sm:mt-8">
               <div className="flex items-center space-x-3 mb-4">
-                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
-                  <UploadCloud className="w-6 h-6" />
+                <div className="p-2.5 sm:p-3 bg-indigo-50 rounded-xl text-indigo-600 shrink-0">
+                  <UploadCloud className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
                     DayBook फ़ाइल अपलोड और इम्पोर्ट (Upload DayBook File)
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -2591,7 +2650,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     किस ब्रांच में इम्पोर्ट करना है? (Target Branch) *
@@ -2599,7 +2658,7 @@ export default function Dashboard() {
                   <select
                     value={importBranchId}
                     onChange={(e) => setImportBranchId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -2610,7 +2669,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center">
-                  <label className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer mt-5">
+                  <label className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer mt-1 sm:mt-5">
                     <input
                       type="checkbox"
                       checked={importClearExisting}
@@ -2622,31 +2681,33 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-stretch">
                 
-                <div className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-2xl p-6 text-center bg-slate-50/50">
-                  <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                  <div className="text-sm font-semibold text-slate-700">अपनी DayBook.txt / .CSV फ़ाइल चुनें</div>
-                  <p className="text-xs text-slate-400 mt-1">Supports Tally DayBook .TXT and .CSV export</p>
-                  
-                  <input
-                    type="file"
-                    accept=".txt,.csv"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    className="mt-3 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                  />
+                <div className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center bg-slate-50/50 flex flex-col justify-between">
+                  <div>
+                    <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400 mx-auto mb-2" />
+                    <div className="text-xs sm:text-sm font-semibold text-slate-700">अपनी DayBook.txt / .CSV फ़ाइल चुनें</div>
+                    <p className="text-[11px] text-slate-400 mt-1">Supports Tally DayBook .TXT and .CSV export</p>
+                    
+                    <input
+                      type="file"
+                      accept=".txt,.csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="mt-3 block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                    />
 
-                  {importFile && (
-                    <div className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50 py-1 px-3 rounded-lg inline-block">
-                      Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
-                    </div>
-                  )}
+                    {importFile && (
+                      <div className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50 py-1 px-3 rounded-lg inline-block">
+                        Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-4">
                     <button
                       disabled={!importFile || importing}
                       onClick={() => handleImport(false)}
-                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow transition flex items-center justify-center space-x-2 ${
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow transition flex items-center justify-center space-x-2 active:scale-95 touch-target-min ${
                         !importFile || importing
                           ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                           : 'bg-indigo-600 hover:bg-indigo-500 text-white'
@@ -2667,25 +2728,27 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="border border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-2xl p-6 text-left relative overflow-hidden">
-                  <div className="flex items-center space-x-2 text-indigo-700 font-bold text-sm mb-1">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    <span>⚡ 1-Click Fast Import (Sample DayBook)</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1 mb-3">
-                    डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">DayBook.CSV / DayBook.txt</code> को सीधे एक क्लिक में इस ब्रांच में इम्पोर्ट करें!
-                  </p>
+                <div className="border border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-left relative overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2 text-indigo-700 font-bold text-xs sm:text-sm mb-1">
+                      <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>⚡ 1-Click Fast Import (Sample DayBook)</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 mb-3">
+                      डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">DayBook.CSV / DayBook.txt</code> को सीधे एक क्लिक में इस ब्रांच में इम्पोर्ट करें!
+                    </p>
 
-                  <div className="bg-white/80 rounded-xl p-3 border border-indigo-100 text-[11px] text-slate-600 space-y-1 mb-4">
-                    <div>• Path: <code>c:\Users\USER\Desktop\BOOKS MATCH\DayBook.CSV</code></div>
-                    <div>• 100% Balanced vouchers (Total Dr == Total Cr, Sum == 0)</div>
-                    <div>• Stores directly in MongoDB <code>focustube</code> collection</div>
+                    <div className="bg-white/80 rounded-xl p-3 border border-indigo-100 text-[11px] text-slate-600 space-y-1 mb-4">
+                      <div className="truncate">• Path: <code>c:\Users\USER\Desktop\BOOKS MATCH\DayBook.CSV</code></div>
+                      <div>• 100% Balanced vouchers (Total Dr == Total Cr, Sum == 0)</div>
+                      <div>• Stores directly in MongoDB <code>focustube</code> collection</div>
+                    </div>
                   </div>
 
                   <button
                     disabled={importing}
                     onClick={() => handleImport(true)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 ${
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 active:scale-95 touch-target-min ${
                       importing
                         ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white'
@@ -2708,40 +2771,40 @@ export default function Dashboard() {
               </div>
 
               {importResult && (
-                <div className="mt-6 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-emerald-800 font-bold text-sm">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <div className="mt-4 sm:mt-6 p-4 sm:p-5 bg-emerald-50 border border-emerald-200 rounded-xl sm:rounded-2xl text-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2 text-emerald-800 font-bold text-xs sm:text-sm">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                       <span>इम्पोर्ट सफलतापूर्वक पूरा हुआ (Import Summary)</span>
                     </div>
-                    <span className="bg-emerald-200 text-emerald-900 px-2.5 py-0.5 rounded-full font-bold text-[11px]">
+                    <span className="bg-emerald-200 text-emerald-900 px-2.5 py-0.5 rounded-full font-bold text-[11px] self-start sm:self-auto">
                       {importResult.branchName}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                      <span className="text-slate-500 block">Total Vouchers</span>
-                      <span className="font-extrabold text-slate-900 text-base">{importResult.totalVouchers}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-100">
+                      <span className="text-slate-500 block text-[11px]">Total Vouchers</span>
+                      <span className="font-extrabold text-slate-900 text-sm sm:text-base font-mono">{importResult.totalVouchers}</span>
                     </div>
-                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                      <span className="text-slate-500 block">Parties Identified</span>
-                      <span className="font-extrabold text-slate-900 text-base">{importResult.totalParties}</span>
+                    <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-100">
+                      <span className="text-slate-500 block text-[11px]">Parties Identified</span>
+                      <span className="font-extrabold text-slate-900 text-sm sm:text-base font-mono">{importResult.totalParties}</span>
                     </div>
-                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                      <span className="text-slate-500 block">Total Debits</span>
-                      <span className="font-extrabold text-amber-700 text-sm">{formatCurrency(importResult.totalDebits)}</span>
+                    <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-100">
+                      <span className="text-slate-500 block text-[11px]">Total Debits</span>
+                      <span className="font-extrabold text-amber-700 text-xs sm:text-sm font-mono whitespace-nowrap">{formatCurrency(importResult.totalDebits)}</span>
                     </div>
-                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
-                      <span className="text-slate-500 block">Total Credits</span>
-                      <span className="font-extrabold text-emerald-700 text-sm">{formatCurrency(importResult.totalCredits)}</span>
+                    <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-100">
+                      <span className="text-slate-500 block text-[11px]">Total Credits</span>
+                      <span className="font-extrabold text-emerald-700 text-xs sm:text-sm font-mono whitespace-nowrap">{formatCurrency(importResult.totalCredits)}</span>
                     </div>
                   </div>
 
                   <div className="pt-2 flex justify-end">
                     <button
                       onClick={() => setActiveTab('matrix')}
-                      className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold"
+                      className="w-full sm:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold active:scale-95 touch-target-min text-center"
                     >
                       View Party Reconciliation Matrix →
                     </button>
@@ -2756,80 +2819,80 @@ export default function Dashboard() {
 
         {/* ==================== TAB 6: RESET & MAINTENANCE ==================== */}
         {companies.length > 0 && activeTab === 'reset' && (
-          <div className="space-y-6 max-w-4xl mx-auto">
+          <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto">
             
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center space-x-3 text-rose-600 mb-4">
-                <Trash2 className="w-6 h-6" />
-                <h3 className="text-base font-bold text-slate-900">
+            <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
+              <div className="flex items-center space-x-3 text-rose-600 mb-3 sm:mb-4">
+                <Trash2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
                   डेटा रीसेट और क्लियर (Clear / Reset Data)
                 </h3>
               </div>
 
-              <p className="text-xs text-slate-500 mb-6">
+              <p className="text-xs text-slate-500 mb-4 sm:mb-6">
                 यूजर आवश्यकतानुसार केवल ट्रांजैक्शन डेटा वाइप कर सकता है ताकि उनके बनाए गए <b>एंटिटी कोड्स</b> और <b>लेजर ग्रुप्स</b> सुरक्षित रहें और नया डेटा अपलोड होते ही स्वतः लागू हो जाएं।
               </p>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {/* Preserve Rules Wipe Option */}
-                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 flex items-center justify-between">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-indigo-600" />
-                      <h4 className="font-extrabold text-indigo-950 text-sm">केवल ट्रांजैक्शन वाइप करें (Wipe Transactions Only - Safe Re-upload)</h4>
+                      <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <h4 className="font-extrabold text-indigo-950 text-xs sm:text-sm">केवल ट्रांजैक्शन वाइप करें (Wipe Transactions Only - Safe Re-upload)</h4>
                     </div>
-                    <p className="text-xs text-indigo-900/80 mt-0.5">
+                    <p className="text-xs text-indigo-900/80 mt-1 sm:mt-0.5">
                       सभी वाउचर्स हट जाएंगे, लेकिन आपके बनाए गए <b>लेजर ग्रुप्स</b> और <b>ब्रांच कोड मैपिंग्स</b> पूरी तरह सुरक्षित रहेंगे। अगली बार अपलोड पर वे अपने आप जुड़ जाएंगे!
                     </p>
                   </div>
                   <button
                     onClick={() => setResetModal({ open: true, type: 'transactions' as any, name: 'All Transactions (Rules Preserved)' })}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow transition whitespace-nowrap"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 touch-target-min whitespace-nowrap text-center"
                   >
                     Wipe Transactions (Keep Rules)
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm">चयनित ब्रांच का डेटा हटाएं (Clear Branch Vouchers)</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">चयनित ब्रांच का डेटा हटाएं (Clear Branch Vouchers)</h4>
+                    <p className="text-xs text-slate-500 mt-1 sm:mt-0.5">
                       केवल चुनी गई ब्रांच के वाउचर्स और लेजर बैलेंस डिलीट होंगे।
                     </p>
                   </div>
                   <button
                     onClick={() => setResetModal({ open: true, type: 'branch', id: importBranchId, name: branches.find(b => b.id === importBranchId)?.name })}
-                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 transition"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 transition active:scale-95 touch-target-min text-center"
                   >
                     Clear Selected Branch Data
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex items-center justify-between">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="font-bold text-amber-900 text-sm">पूरी कंपनी का डेटा हटाएं (Clear Company Data)</h4>
-                    <p className="text-xs text-amber-700 mt-0.5">
+                    <h4 className="font-bold text-amber-900 text-xs sm:text-sm">पूरी कंपनी का डेटा हटाएं (Clear Company Data)</h4>
+                    <p className="text-xs text-amber-700 mt-1 sm:mt-0.5">
                       इस कंपनी की सभी ब्रांचेस के वाउचर्स और रिकंसीलेशन साफ हो जाएंगे।
                     </p>
                   </div>
                   <button
                     onClick={() => setResetModal({ open: true, type: 'company', name: selectedCompany?.name })}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow transition"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 touch-target-min text-center"
                   >
                     Clear Company Data
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-rose-300 bg-rose-50/70 flex items-center justify-between">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-rose-300 bg-rose-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="font-bold text-rose-950 text-sm">संपूर्ण डेटाबेस रीसेट (Complete Database Wipe)</h4>
-                    <p className="text-xs text-rose-800 mt-0.5">
+                    <h4 className="font-bold text-rose-950 text-xs sm:text-sm">संपूर्ण डेटाबेस रीसेट (Complete Database Wipe)</h4>
+                    <p className="text-xs text-rose-800 mt-1 sm:mt-0.5">
                       सभी कंपनियां, ब्रांचेस, वाउचर्स और पार्टी लेजर रिकॉर्ड्स स्थायी रूप से डिलीट हो जाएंगे।
                     </p>
                   </div>
                   <button
                     onClick={() => setResetModal({ open: true, type: 'all', name: 'All Database Collections' })}
-                    className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow transition"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 touch-target-min text-center"
                   >
                     Wipe Entire Database
                   </button>
@@ -2864,9 +2927,9 @@ export default function Dashboard() {
 
       {/* New Company Modal */}
       {showNewCompanyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">नई कंपनी बनाएं (Add New Company)</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 touch-scroll overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6 border border-slate-200 my-auto">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1.5 sm:mb-2">नई कंपनी बनाएं (Add New Company)</h3>
             <p className="text-xs text-slate-500 mb-4">
               कंपनी का नाम दर्ज करें जिसके अंतर्गत विभिन्न ब्रांचेस का डेटा रिकंसाइल होगा।
             </p>
@@ -2879,7 +2942,7 @@ export default function Dashboard() {
                   placeholder="उदा. Supreme Steels Pvt Ltd"
                   value={newCompanyName}
                   onChange={(e) => setNewCompanyName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
@@ -2891,7 +2954,7 @@ export default function Dashboard() {
                   placeholder="उदा. SUPR"
                   value={newCompanyCode}
                   onChange={(e) => setNewCompanyCode(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
                 />
               </div>
 
@@ -2899,13 +2962,13 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setShowNewCompanyModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-95 touch-target-min"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow"
+                  className="px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow active:scale-95 touch-target-min"
                 >
                   Create Company
                 </button>
@@ -2917,9 +2980,9 @@ export default function Dashboard() {
 
       {/* New Branch Modal */}
       {showNewBranchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">नई ब्रांच जोड़ें (Add New Branch)</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 touch-scroll overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6 border border-slate-200 my-auto">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1.5 sm:mb-2">नई ब्रांच जोड़ें (Add New Branch)</h3>
             <p className="text-xs text-slate-500 mb-4">
               ब्रांच का नाम दर्ज करें जिसके लिए DayBook अपलोड की जाएगी।
             </p>
@@ -2932,7 +2995,7 @@ export default function Dashboard() {
                   placeholder="उदा. Jogeshwari Branch / Bhiwandi Godown"
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
@@ -2944,7 +3007,7 @@ export default function Dashboard() {
                   placeholder="उदा. JOG / BHW"
                   value={newBranchCode}
                   onChange={(e) => setNewBranchCode(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
                 />
               </div>
 
@@ -2952,13 +3015,13 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setShowNewBranchModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-95 touch-target-min"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow"
+                  className="px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow active:scale-95 touch-target-min"
                 >
                   Create Branch
                 </button>
@@ -2970,11 +3033,11 @@ export default function Dashboard() {
 
       {/* Reset Confirmation Modal */}
       {resetModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-rose-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 touch-scroll overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6 border border-rose-200 my-auto">
             <div className="flex items-center space-x-3 text-rose-600 mb-3">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-base font-bold text-slate-900">डेटा डिलीट करने की पुष्टि (Confirm Delete)</h3>
+              <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">डेटा डिलीट करने की पुष्टि (Confirm Delete)</h3>
             </div>
             
             <div className="text-xs text-slate-600 mb-5 space-y-1">
@@ -2997,14 +3060,14 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setResetModal({ open: false, type: 'company' })}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-95 touch-target-min"
               >
                 रद्द करें (Cancel)
               </button>
               <button
                 disabled={resetLoading}
                 onClick={executeReset}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow transition flex items-center space-x-1.5"
+                className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center space-x-1.5 active:scale-95 touch-target-min"
               >
                 {resetLoading ? (
                   <span>Deleting...</span>
