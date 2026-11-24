@@ -1,0 +1,157 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('companyId');
+    const partyName = searchParams.get('partyName');
+    const branchFilter = searchParams.get('branchId'); // optional
+    const vTypeFilter = searchParams.get('voucherType'); // optional
+
+    if (!companyId || !partyName) {
+      return NextResponse.json({ success: false, error: 'companyId and partyName are required' }, { status: 400 });
+    }
+
+    const { db } = await connectToDatabase();
+
+    // Query vouchers where lines.account == partyName
+    const query: any = {
+      companyId,
+      "lines.account": partyName
+    };
+    if (branchFilter && branchFilter !== 'all') {
+      query.branchId = branchFilter;
+    }
+
+    const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
+
+    // Summary counters
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const voucherTypeCounts: {
+      [key: string]: { count: number; debit: number; credit: number; label: string }
+    } = {
+      'Pymt': { count: 0, debit: 0, credit: 0, label: 'Payment (भुगतान)' },
+      'Rcpt': { count: 0, debit: 0, credit: 0, label: 'Receipt (प्राप्ति)' },
+      'Sale': { count: 0, debit: 0, credit: 0, label: 'Sales (बिक्री)' },
+      'Purc': { count: 0, debit: 0, credit: 0, label: 'Purchase (खरीद)' },
+      'Jrnl': { count: 0, debit: 0, credit: 0, label: 'Journal (जनरल)' },
+      'Ctra': { count: 0, debit: 0, credit: 0, label: 'Contra (कॉन्ट्रा)' },
+      'C/Note': { count: 0, debit: 0, credit: 0, label: 'Credit Note (जमा पत्र)' },
+      'D/Note': { count: 0, debit: 0, credit: 0, label: 'Debit Note (नाम पत्र)' },
+      'Other': { count: 0, debit: 0, credit: 0, label: 'Other (अन्य)' }
+    };
+
+    const branchBreakdownMap = new Map<string, {
+      branchId: string;
+      branchName: string;
+      totalDebit: number;
+      totalCredit: number;
+      voucherCounts: { [vt: string]: number };
+      totalCount: number;
+    }>();
+
+    const transactions: any[] = [];
+    let runningBalance = 0;
+
+    for (const v of vouchers) {
+      // Find line(s) corresponding to partyName
+      let vDebit = 0;
+      let vCredit = 0;
+      const counterAccounts: string[] = [];
+
+      for (const line of v.lines) {
+        if (line.account === partyName) {
+          vDebit += (line.debit || 0);
+          vCredit += (line.credit || 0);
+        } else {
+          counterAccounts.push(line.account);
+        }
+      }
+
+      totalDebit += vDebit;
+      totalCredit += vCredit;
+      runningBalance += (vDebit - vCredit);
+
+      // Voucher type stats
+      let vtKey = v.voucherType || 'Other';
+      if (!voucherTypeCounts[vtKey]) {
+        voucherTypeCounts[vtKey] = { count: 0, debit: 0, credit: 0, label: vtKey };
+      }
+      voucherTypeCounts[vtKey].count++;
+      voucherTypeCounts[vtKey].debit += vDebit;
+      voucherTypeCounts[vtKey].credit += vCredit;
+
+      // Branch stats
+      const bId = v.branchId;
+      const bName = v.branchName || 'Unknown Branch';
+      if (!branchBreakdownMap.has(bId)) {
+        branchBreakdownMap.set(bId, {
+          branchId: bId,
+          branchName: bName,
+          totalDebit: 0,
+          totalCredit: 0,
+          voucherCounts: {},
+          totalCount: 0
+        });
+      }
+      const bStats = branchBreakdownMap.get(bId)!;
+      bStats.totalDebit += vDebit;
+      bStats.totalCredit += vCredit;
+      bStats.totalCount++;
+      bStats.voucherCounts[vtKey] = (bStats.voucherCounts[vtKey] || 0) + 1;
+
+      // Filter by voucher type if requested
+      if (!vTypeFilter || vTypeFilter === 'all' || v.voucherType === vTypeFilter) {
+        transactions.push({
+          id: v._id.toString(),
+          date: v.date,
+          dateStr: v.dateStr,
+          voucherType: v.voucherType,
+          voucherNo: v.voucherNo || '-',
+          branchId: v.branchId,
+          branchName: bName,
+          particulars: counterAccounts.length > 0 ? counterAccounts.slice(0, 3).join(', ') : (v.narration || partyName),
+          narration: v.narration || '',
+          debit: vDebit,
+          credit: vCredit,
+          runningBalance: Math.round(runningBalance * 100) / 100,
+          balanceType: runningBalance > 0.01 ? 'Dr' : (runningBalance < -0.01 ? 'Cr' : 'Nil')
+        });
+      }
+    }
+
+    const netBal = Math.round((totalDebit - totalCredit) * 100) / 100;
+
+    return NextResponse.json({
+      success: true,
+      partyName,
+      summary: {
+        totalDebit: Math.round(totalDebit * 100) / 100,
+        totalCredit: Math.round(totalCredit * 100) / 100,
+        netBalance: netBal,
+        status: netBal > 0.01 ? 'Dr' : (netBal < -0.01 ? 'Cr' : 'Nil'),
+        totalTransactions: vouchers.length
+      },
+      voucherTypeCounts,
+      branchBreakdowns: Array.from(branchBreakdownMap.values()).map(b => {
+        const net = Math.round((b.totalDebit - b.totalCredit) * 100) / 100;
+        return {
+          ...b,
+          totalDebit: Math.round(b.totalDebit * 100) / 100,
+          totalCredit: Math.round(b.totalCredit * 100) / 100,
+          netBalance: net,
+          status: net > 0.01 ? 'Dr' : (net < -0.01 ? 'Cr' : 'Nil')
+        };
+      }),
+      transactions
+    });
+
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
