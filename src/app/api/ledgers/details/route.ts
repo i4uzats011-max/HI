@@ -8,8 +8,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('companyId');
     const partyName = searchParams.get('partyName');
-    const branchFilter = searchParams.get('branchId'); // optional
-    const vTypeFilter = searchParams.get('voucherType'); // optional
+    const branchFilter = searchParams.get('branchId') || 'all'; // 'all' or specific branchId
+    const vTypeFilter = searchParams.get('voucherType') || 'all';
 
     if (!companyId || !partyName) {
       return NextResponse.json({ success: false, error: 'companyId and partyName are required' }, { status: 400 });
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Query vouchers where lines.account == partyName
+    // Query vouchers for this party in this company
     const query: any = {
       companyId,
       "lines.account": partyName
@@ -26,6 +26,12 @@ export async function GET(req: NextRequest) {
       query.branchId = branchFilter;
     }
 
+    // Also get all branches for metadata
+    const branches = await db.collection('branches').find({ companyId }).toArray();
+    const branchNameMap = new Map<string, string>();
+    branches.forEach(b => branchNameMap.set(b._id.toString(), b.name));
+
+    // Fetch matching vouchers sorted by date asc
     const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
 
     // Summary counters
@@ -55,11 +61,24 @@ export async function GET(req: NextRequest) {
       totalCount: number;
     }>();
 
+    // Fetch all party balances for this party across all branches in company
+    const allPartyBalances = await db.collection('party_balances').find({ companyId, partyName }).toArray();
+    for (const pb of allPartyBalances) {
+      const bName = branchNameMap.get(pb.branchId) || pb.branchName || 'Branch';
+      branchBreakdownMap.set(pb.branchId, {
+        branchId: pb.branchId,
+        branchName: bName,
+        totalDebit: pb.totalDebit || 0,
+        totalCredit: pb.totalCredit || 0,
+        voucherCounts: {},
+        totalCount: pb.voucherCount || 0
+      });
+    }
+
     const transactions: any[] = [];
     let runningBalance = 0;
 
     for (const v of vouchers) {
-      // Find line(s) corresponding to partyName
       let vDebit = 0;
       let vCredit = 0;
       const counterAccounts: string[] = [];
@@ -75,9 +94,9 @@ export async function GET(req: NextRequest) {
 
       totalDebit += vDebit;
       totalCredit += vCredit;
+      // In Tally: Debit increases party receivable (+), Credit decreases party receivable (-)
       runningBalance += (vDebit - vCredit);
 
-      // Voucher type stats
       let vtKey = v.voucherType || 'Other';
       if (!voucherTypeCounts[vtKey]) {
         voucherTypeCounts[vtKey] = { count: 0, debit: 0, credit: 0, label: vtKey };
@@ -86,9 +105,9 @@ export async function GET(req: NextRequest) {
       voucherTypeCounts[vtKey].debit += vDebit;
       voucherTypeCounts[vtKey].credit += vCredit;
 
-      // Branch stats
+      // Update branch breakdown
       const bId = v.branchId;
-      const bName = v.branchName || 'Unknown Branch';
+      const bName = branchNameMap.get(bId) || v.branchName || 'Branch';
       if (!branchBreakdownMap.has(bId)) {
         branchBreakdownMap.set(bId, {
           branchId: bId,
@@ -100,9 +119,6 @@ export async function GET(req: NextRequest) {
         });
       }
       const bStats = branchBreakdownMap.get(bId)!;
-      bStats.totalDebit += vDebit;
-      bStats.totalCredit += vCredit;
-      bStats.totalCount++;
       bStats.voucherCounts[vtKey] = (bStats.voucherCounts[vtKey] || 0) + 1;
 
       // Filter by voucher type if requested
@@ -119,6 +135,7 @@ export async function GET(req: NextRequest) {
           narration: v.narration || '',
           debit: vDebit,
           credit: vCredit,
+          amount: vCredit > 0 ? vCredit : -vDebit,
           runningBalance: Math.round(runningBalance * 100) / 100,
           balanceType: runningBalance > 0.01 ? 'Dr' : (runningBalance < -0.01 ? 'Cr' : 'Nil')
         });
@@ -130,6 +147,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       partyName,
+      branchFilter,
       summary: {
         totalDebit: Math.round(totalDebit * 100) / 100,
         totalCredit: Math.round(totalCredit * 100) / 100,

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { parseDayBookContent, ParsedVoucher } from '@/lib/tallyParser';
+import { parseDayBookContent } from '@/lib/tallyParser';
 import fs from 'fs';
 import path from 'path';
 
-export const maxDuration = 120; // 2 minutes for large files
+export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -22,9 +22,12 @@ export async function POST(req: NextRequest) {
       clearExisting = body.clearExisting !== false;
 
       if (body.useSampleFile) {
-        const samplePath = path.join(process.cwd(), 'DayBook.txt');
+        let samplePath = path.join(process.cwd(), 'DayBook.CSV');
         if (!fs.existsSync(samplePath)) {
-          return NextResponse.json({ success: false, error: 'DayBook.txt sample file not found on server' }, { status: 404 });
+          samplePath = path.join(process.cwd(), 'DayBook.txt');
+        }
+        if (!fs.existsSync(samplePath)) {
+          return NextResponse.json({ success: false, error: 'DayBook file not found on server' }, { status: 404 });
         }
         fileContent = fs.readFileSync(samplePath, 'latin1');
       } else if (body.fileContent) {
@@ -41,7 +44,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
       }
       const buffer = await file.arrayBuffer();
-      // Decode as latin1 or utf8
       const decoder = new TextDecoder('latin1');
       fileContent = decoder.decode(buffer);
     }
@@ -56,7 +58,6 @@ export async function POST(req: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Verify company and branch exist
     const [company, branch] = await Promise.all([
       db.collection('companies').findOne({ _id: new (require('mongodb').ObjectId)(companyId) }).catch(() => null),
       db.collection('branches').findOne({ _id: new (require('mongodb').ObjectId)(branchId) }).catch(() => null)
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     const companyName = company?.name || 'Company';
     const branchName = branch?.name || 'Branch';
 
-    // Parse the file
+    // Parse DayBook content with exact single-entry rules
     const parseResult = parseDayBookContent(fileContent);
     const { vouchers, totalDebits, totalCredits } = parseResult;
 
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'No valid vouchers found in the uploaded file' }, { status: 400 });
     }
 
-    // If clearExisting is true, clear this branch's data first
+    // Clear existing vouchers/balances for this branch if requested
     if (clearExisting) {
       await Promise.all([
         db.collection('vouchers').deleteMany({ branchId }),
