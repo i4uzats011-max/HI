@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
 
     const companyName = company?.name || 'Company';
     const branchName = branch?.name || 'Branch';
+    const branchCode = (branch?.code || '').trim().toUpperCase();
 
     // Parse DayBook content with exact double-entry rules
     const parseResult = parseDayBookContent(fileContent);
@@ -116,13 +117,14 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    // Prepare vouchers with metadata
+    // Prepare vouchers with metadata including branchCode
     const vouchersToInsert = vouchers.map((v) => ({
       ...v,
       companyId,
       companyName,
       branchId,
       branchName,
+      branchCode,
       createdAt: new Date()
     }));
 
@@ -217,6 +219,7 @@ export async function POST(req: NextRequest) {
         companyName,
         branchId,
         branchName,
+        branchCode,
         partyName: p.partyName,
         totalDebit: Math.round(p.totalDebit * 100) / 100,
         totalCredit: Math.round(p.totalCredit * 100) / 100,

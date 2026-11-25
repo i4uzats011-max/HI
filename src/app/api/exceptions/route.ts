@@ -60,9 +60,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const totalIgnoredAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
+    const totalIgnoredDebit = items.reduce((s, i) => s + (i.debit || 0), 0);
+    const totalIgnoredCredit = items.reduce((s, i) => s + (i.credit || 0), 0);
+
     return NextResponse.json({
       success: true,
       totalExceptions: items.length,
+      totalIgnoredAmount: Math.round(totalIgnoredAmount * 100) / 100,
+      totalIgnoredDebit: Math.round(totalIgnoredDebit * 100) / 100,
+      totalIgnoredCredit: Math.round(totalIgnoredCredit * 100) / 100,
       exceptions: items
     });
 

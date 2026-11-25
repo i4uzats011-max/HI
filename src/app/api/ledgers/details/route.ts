@@ -73,6 +73,9 @@ export async function GET(req: NextRequest) {
     const branchNameMap = new Map<string, string>();
     branches.forEach(b => branchNameMap.set(b._id.toString(), b.name));
 
+    // Check if this party is declared as a branch account
+    const branchMapping = partyName ? await db.collection('branch_ledger_mappings').findOne({ companyId, partyName }) : null;
+
     // Fetch active vouchers sorted by date asc
     const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
 
@@ -216,6 +219,12 @@ export async function GET(req: NextRequest) {
       isGroupView: targetAccounts.length > 1,
       targetAccounts,
       groupInfo,
+      branchMapping: branchMapping ? {
+        isBranchAccount: true,
+        mappedBranchCode: branchMapping.targetBranchCode,
+        targetBranchName: branchMapping.targetBranchName,
+        targetBranchId: branchMapping.targetBranchId
+      } : null,
       branchFilter,
       ignoredCount,
       summary: {

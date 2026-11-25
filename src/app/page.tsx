@@ -108,6 +108,7 @@ export default function Dashboard() {
 
   // Exceptions Report State
   const [exceptions, setExceptions] = useState<any[]>([]);
+  const [exceptionsSummary, setExceptionsSummary] = useState<any>(null);
   const [exceptionsLoading, setExceptionsLoading] = useState<boolean>(false);
   const [exceptionsSearch, setExceptionsSearch] = useState<string>('');
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -225,6 +226,12 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.success) {
         setExceptions(json.exceptions || []);
+        setExceptionsSummary({
+          totalExceptions: json.totalExceptions ?? (json.exceptions || []).length,
+          totalIgnoredAmount: json.totalIgnoredAmount || 0,
+          totalIgnoredDebit: json.totalIgnoredDebit || 0,
+          totalIgnoredCredit: json.totalIgnoredCredit || 0
+        });
       }
     } catch (err) {
       console.error(err);
@@ -380,15 +387,16 @@ export default function Dashboard() {
   async function handleCreateBranch(e: React.FormEvent) {
     e.preventDefault();
     if (!newBranchName.trim() || !selectedCompanyId) return;
+    const finalCode = (newBranchCode.trim() || newBranchName.trim().replace(/[^a-zA-Z0-9]/g, '').slice(0, 3)).toUpperCase();
     try {
       const res = await fetch('/api/branches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: selectedCompanyId, name: newBranchName, code: newBranchCode })
+        body: JSON.stringify({ companyId: selectedCompanyId, name: newBranchName.trim(), code: finalCode })
       });
       const json = await res.json();
       if (json.success) {
-        showToast('ब्रांच सफलतापूर्वक बनाई गई!');
+        showToast(`ब्रांच "${newBranchName}" (कोड: ${finalCode}) सफलतापूर्वक बनाई गई!`);
         setNewBranchName('');
         setNewBranchCode('');
         setShowNewBranchModal(false);
@@ -1332,13 +1340,18 @@ export default function Dashboard() {
                   />
 
                   {branches.length > 0 && (
-                    <div className="hidden sm:flex items-center space-x-1 shrink-0">
-                      <span className="text-[10px] text-slate-400">Quick:</span>
+                    <div className="flex flex-wrap items-center gap-1 shrink-0">
+                      <span className="text-[10px] text-slate-400 font-semibold">Quick Code:</span>
                       {branches.map(b => (
                         <button
                           key={b.id}
                           onClick={() => setAssignBranchCode(b.code)}
-                          className="px-2 py-0.5 bg-white hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold text-purple-700 font-mono active:scale-95"
+                          className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono transition active:scale-95 ${
+                            assignBranchCode === b.code
+                              ? 'bg-purple-600 text-white shadow-sm'
+                              : 'bg-white hover:bg-purple-100 text-purple-700 border border-purple-200'
+                          }`}
+                          title={`ब्रांच कोड: ${b.name} (${b.code})`}
                         >
                           {b.code}
                         </button>
@@ -2438,6 +2451,45 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Exceptions Summary KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white border border-rose-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
+                <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600 shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-500 font-semibold block">कुल इग्नोर की गई एंट्रियां</span>
+                  <span className="text-base sm:text-lg font-bold text-slate-900 font-mono">
+                    {exceptionsSummary?.totalExceptions ?? exceptions.length} Entries
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-rose-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
+                <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+                  <Ban className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-500 font-semibold block">कुल इग्नोर राशि (Total Ignored)</span>
+                  <span className="text-base sm:text-lg font-bold text-rose-700 font-mono whitespace-nowrap">
+                    {formatCurrency(exceptionsSummary?.totalIgnoredAmount || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-emerald-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
+                <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-500 font-semibold block">रिकन्सिलेशन स्थिति</span>
+                  <span className="text-xs font-bold text-emerald-800 block">
+                    ✓ लेजर बैलेंस से सुरक्षित रूप से अलग
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Filter Search */}
             <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
@@ -2989,26 +3041,39 @@ export default function Dashboard() {
 
             <form onSubmit={handleCreateBranch} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Branch Name *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Branch Name (ब्रांच का नाम) *</label>
                 <input
                   type="text"
-                  placeholder="उदा. Jogeshwari Branch / Bhiwandi Godown"
+                  placeholder="उदा. Jogeshwari Branch / Utrakshi Overseas"
                   value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewBranchName(val);
+                    if (!newBranchCode || newBranchCode.length <= 3) {
+                      const auto = val.trim().replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
+                      if (auto) setNewBranchCode(auto);
+                    }
+                  }}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Branch Code (वैकल्पिक)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Branch Code (ब्रांच कोड - रिकन्सिलेशन के लिए पहचान) *
+                </label>
                 <input
                   type="text"
-                  placeholder="उदा. JOG / BHW"
+                  placeholder="उदा. JOG / INF / UTR"
                   value={newBranchCode}
-                  onChange={(e) => setNewBranchCode(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                  onChange={(e) => setNewBranchCode(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase font-mono font-bold"
+                  required
                 />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  यह कोड अन्य ब्रांचों के लेजर्स में मैप होकर टू-वे रिकन्सिलेशन करेगा।
+                </span>
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-2">

@@ -21,7 +21,8 @@ import {
   Ban,
   RotateCcw,
   Scale,
-  Columns
+  Columns,
+  Tag
 } from 'lucide-react';
 
 interface PartyLedgerModalProps {
@@ -43,6 +44,9 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
   const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [isGroupMode, setIsGroupMode] = useState<boolean>(!!groupName);
+  const [showCodeInput, setShowCodeInput] = useState<boolean>(false);
+  const [targetCode, setTargetCode] = useState<string>('');
+  const [savingCode, setSavingCode] = useState<boolean>(false);
 
   useEffect(() => {
     if (!partyName && !groupName) return;
@@ -116,6 +120,57 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
     }
   }
 
+  // Handle assign branch code to this ledger
+  async function handleSaveBranchCode(codeToSave: string) {
+    if (!partyName || !codeToSave.trim()) return;
+    setSavingCode(true);
+    try {
+      const res = await fetch('/api/branches/mappings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          partyName,
+          branchCode: codeToSave.trim().toUpperCase()
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionSuccessMsg(`लेजर "${partyName}" को ब्रांच कोड "${codeToSave.trim().toUpperCase()}" दे दिया गया।`);
+        setTimeout(() => setActionSuccessMsg(null), 4000);
+        setShowCodeInput(false);
+        setTargetCode('');
+        await fetchLedger();
+        if (onVoucherIgnored) onVoucherIgnored();
+      } else {
+        alert(json.error || 'Failed to save branch code');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSavingCode(false);
+    }
+  }
+
+  // Handle remove branch code from this ledger
+  async function handleRemoveBranchCode() {
+    if (!partyName) return;
+    try {
+      const res = await fetch(`/api/branches/mappings?companyId=${companyId}&partyName=${encodeURIComponent(partyName)}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        setActionSuccessMsg(`लेजर "${partyName}" से ब्रांच कोड हटा दिया गया।`);
+        setTimeout(() => setActionSuccessMsg(null), 4000);
+        await fetchLedger();
+        if (onVoucherIgnored) onVoucherIgnored();
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
+
   if (!partyName) return null;
 
   const vTypeIcons: { [k: string]: any } = {
@@ -179,6 +234,60 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
                     <Ban className="w-3 h-3" />
                     <span>{data.ignoredCount} Ignored</span>
                   </span>
+                )}
+                {data?.branchMapping?.isBranchAccount ? (
+                  <div className="flex items-center space-x-1">
+                    <span className="px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full bg-purple-500/30 border border-purple-400/40 text-purple-200 font-mono flex items-center space-x-1">
+                      <Tag className="w-3 h-3 text-purple-300" />
+                      <span>ब्रांच कोड: {data.branchMapping.mappedBranchCode}</span>
+                    </span>
+                    <button
+                      onClick={handleRemoveBranchCode}
+                      className="text-purple-300 hover:text-rose-300 text-[10px] underline ml-1 active:scale-95"
+                      title="ब्रांच कोड हटाएं"
+                    >
+                      हटाएं
+                    </button>
+                  </div>
+                ) : (
+                  partyName && !groupName && (
+                    <div className="relative">
+                      {!showCodeInput ? (
+                        <button
+                          onClick={() => setShowCodeInput(true)}
+                          className="px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full bg-white/10 hover:bg-white/20 text-indigo-200 border border-indigo-400/30 flex items-center space-x-1 active:scale-95 transition"
+                          title="इस लेजर को किसी ब्रांच से लिंक करने के लिए ब्रांच कोड दें"
+                        >
+                          <Tag className="w-3 h-3 text-indigo-300" />
+                          <span>+ ब्रांच कोड दें</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center space-x-1 bg-slate-900 border border-indigo-400/50 rounded-xl p-1 shadow-lg">
+                          <input
+                            type="text"
+                            placeholder="Code (उदा. UTR, INF)"
+                            value={targetCode}
+                            onChange={(e) => setTargetCode(e.target.value)}
+                            className="bg-white/10 text-white placeholder-slate-400 text-xs px-2 py-0.5 rounded uppercase font-mono w-28 focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            disabled={!targetCode.trim() || savingCode}
+                            onClick={() => handleSaveBranchCode(targetCode)}
+                            className="px-2 py-0.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold active:scale-95"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setShowCodeInput(false); setTargetCode(''); }}
+                            className="px-1 text-slate-400 hover:text-white text-xs"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
               <p className="text-[11px] sm:text-xs text-indigo-200 mt-0.5 flex items-center space-x-1.5 flex-wrap">

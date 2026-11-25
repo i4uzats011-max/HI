@@ -42,11 +42,11 @@ export async function GET(req: NextRequest) {
     const mappings = await db.collection('branch_ledger_mappings').find({ companyId }).toArray();
     const b1MappedToB2 = mappings.filter(m =>
       (m.branchId === b1Id || m.branchId === 'all') &&
-      (m.targetBranchId === b2Id || (b2Code && m.targetBranchCode === b2Code))
+      (m.targetBranchId === b2Id || (b2Code && (m.targetBranchCode || '').trim().toUpperCase() === b2Code))
     );
     const b2MappedToB1 = mappings.filter(m =>
       (m.branchId === b2Id || m.branchId === 'all') &&
-      (m.targetBranchId === b1Id || (b1Code && m.targetBranchCode === b1Code))
+      (m.targetBranchId === b1Id || (b1Code && (m.targetBranchCode || '').trim().toUpperCase() === b1Code))
     );
 
     const b1MappedNames = new Set(b1MappedToB2.map(m => m.partyName));
@@ -62,17 +62,25 @@ export async function GET(req: NextRequest) {
     const b2Keywords = [b2.name.toLowerCase(), b2Code.toLowerCase()].filter(Boolean);
     const b1Keywords = [b1.name.toLowerCase(), b1Code.toLowerCase()].filter(Boolean);
 
-    const matchedInB1 = b1Accounts.filter(a =>
-      b1MappedNames.has(a.partyName) ||
-      (a.mappedBranchCode && a.mappedBranchCode === b2Code) ||
-      (b1MappedNames.size === 0 && b2Keywords.some(kw => a.partyName.toLowerCase().includes(kw)))
-    );
+    const matchedInB1 = b1Accounts.filter(a => {
+      const aCode = (a.mappedBranchCode || '').trim().toUpperCase();
+      return (
+        b1MappedNames.has(a.partyName) ||
+        (aCode && aCode === b2Code) ||
+        (a.targetBranchId && a.targetBranchId === b2Id) ||
+        b2Keywords.some(kw => kw.length >= 3 && a.partyName.toLowerCase().includes(kw))
+      );
+    });
 
-    const matchedInB2 = b2Accounts.filter(a =>
-      b2MappedNames.has(a.partyName) ||
-      (a.mappedBranchCode && a.mappedBranchCode === b1Code) ||
-      (b2MappedNames.size === 0 && b1Keywords.some(kw => a.partyName.toLowerCase().includes(kw)))
-    );
+    const matchedInB2 = b2Accounts.filter(a => {
+      const aCode = (a.mappedBranchCode || '').trim().toUpperCase();
+      return (
+        b2MappedNames.has(a.partyName) ||
+        (aCode && aCode === b1Code) ||
+        (a.targetBranchId && a.targetBranchId === b1Id) ||
+        b1Keywords.some(kw => kw.length >= 3 && a.partyName.toLowerCase().includes(kw))
+      );
+    });
 
     const b1NamesList = matchedInB1.map(a => a.partyName);
     const b2NamesList = matchedInB2.map(a => a.partyName);
