@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { invalidateCompanyCache } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -161,6 +162,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await invalidateCompanyCache(companyId);
+
     return NextResponse.json({
       success: true,
       message: `${names.length} ledger(s) successfully declared as branch with code "${cleanCode}"`
@@ -198,6 +201,8 @@ export async function DELETE(req: NextRequest) {
         }
       })
     ]);
+
+    await invalidateCompanyCache(companyId);
 
     return NextResponse.json({ success: true, message: `Branch declaration removed from "${partyName}"` });
 

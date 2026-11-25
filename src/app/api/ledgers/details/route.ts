@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { getCache, setCache } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,13 @@ export async function GET(req: NextRequest) {
 
     if (!companyId || (!partyName && !groupNameParam)) {
       return NextResponse.json({ success: false, error: 'companyId and either partyName or groupName are required' }, { status: 400 });
+    }
+
+    // High speed cache lookup (Redis / RAM)
+    const cacheKey = `company:${companyId}:ledger:${partyName || groupNameParam}:${branchFilter}:${vTypeFilter}:${isGroupMode}`;
+    const cachedResponse = await getCache<any>(cacheKey);
+    if (cachedResponse) {
+      return NextResponse.json(cachedResponse);
     }
 
     const { db } = await connectToDatabase();
@@ -76,8 +84,19 @@ export async function GET(req: NextRequest) {
     // Check if this party is declared as a branch account
     const branchMapping = partyName ? await db.collection('branch_ledger_mappings').findOne({ companyId, partyName }) : null;
 
-    // Fetch active vouchers sorted by date asc
-    const vouchers = await db.collection('vouchers').find(query).sort({ date: 1, _id: 1 }).toArray();
+    // Fetch active vouchers sorted by date asc with selective projection for lightning speed
+    const vouchers = await db.collection('vouchers').find(query, {
+      projection: {
+        date: 1,
+        dateStr: 1,
+        voucherType: 1,
+        voucherNo: 1,
+        narration: 1,
+        branchId: 1,
+        branchName: 1,
+        lines: 1
+      }
+    }).sort({ date: 1, _id: 1 }).toArray();
 
     // Count ignored entries for these accounts
     const ignoredCount = await db.collection('vouchers').countDocuments({
@@ -212,7 +231,7 @@ export async function GET(req: NextRequest) {
 
     const netBal = Math.round((totalDebit - totalCredit) * 100) / 100;
 
-    return NextResponse.json({
+    const responsePayload = {
       success: true,
       partyName,
       displayName: targetAccounts.length > 1 ? (groupInfo?.groupName ? `[GROUP] ${groupInfo.groupName}` : partyName) : partyName,
@@ -246,7 +265,12 @@ export async function GET(req: NextRequest) {
         };
       }),
       transactions
-    });
+    };
+
+    // Store in cache for 5 minutes
+    await setCache(cacheKey, responsePayload, 300);
+
+    return NextResponse.json(responsePayload);
 
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

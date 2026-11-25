@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ReduxProvider from '@/components/ReduxProvider';
 
 export const metadata: Metadata = {
   title: 'Books Match - Multi-Branch Accounting & Party Ledger Reconciliation',
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased touch-manipulation">
-        {children}
+        <ReduxProvider>
+          {children}
+        </ReduxProvider>
       </body>
     </html>
   );

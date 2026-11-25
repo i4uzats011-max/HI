@@ -1,6 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  setMatrixData as setReduxMatrixData,
+  setDeclaredLedgers as setReduxDeclaredLedgers,
+  setExceptions as setReduxExceptions,
+  setMatrixSearch as setReduxMatrixSearch,
+  setMatrixFilter as setReduxMatrixFilter,
+  setMatrixViewMode as setReduxMatrixViewMode,
+  setDeclareSearch as setReduxDeclareSearch,
+  setDeclaredOnly as setReduxDeclaredOnly,
+  setExceptionsSearch as setReduxExceptionsSearch,
+  selectFilteredParties,
+  selectFilteredGroups,
+  selectFilteredDeclaredLedgers,
+  selectFilteredExceptions
+} from '@/store/ledgerSlice';
 import {
   Building,
   Building2,
@@ -43,8 +59,15 @@ import {
 import PartyLedgerModal from '@/components/PartyLedgerModal';
 
 export default function Dashboard() {
+  const dispatch = useDispatch();
   // Navigation tabs: matrix, groups, declare, interbranch, exceptions, branches, reset
   const [activeTab, setActiveTab] = useState<'matrix' | 'groups' | 'declare' | 'interbranch' | 'exceptions' | 'branches' | 'reset'>('matrix');
+
+  // Redux Selectors for Instant Internal Memory Search & State
+  const filteredReduxParties = useSelector(selectFilteredParties);
+  const filteredReduxGroups = useSelector(selectFilteredGroups);
+  const filteredReduxDeclaredLedgers = useSelector(selectFilteredDeclaredLedgers);
+  const filteredReduxExceptions = useSelector(selectFilteredExceptions);
 
   // Company State
   const [companies, setCompanies] = useState<any[]>([]);
@@ -128,6 +151,115 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // ULTRA-FAST IN-MEMORY SEARCH (0ms delay for instant UI responsiveness)
+  const displayParties = useMemo(() => {
+    const source = matrixData?.parties || [];
+    const clean = matrixSearch.trim().toLowerCase();
+    let res = source;
+    if (clean) {
+      res = res.filter((p: any) =>
+        (p.partyName || '').toLowerCase().includes(clean) ||
+        (p.groupName || '').toLowerCase().includes(clean) ||
+        (p.mappedBranchCode || '').toLowerCase().includes(clean)
+      );
+    }
+    if (matrixFilter === 'multi_branch') res = res.filter((p: any) => p.isMultiBranch);
+    else if (matrixFilter === 'dr') res = res.filter((p: any) => p.status === 'Dr');
+    else if (matrixFilter === 'cr') res = res.filter((p: any) => p.status === 'Cr');
+    else if (matrixFilter === 'grouped') res = res.filter((p: any) => p.isGrouped);
+    else if (matrixFilter === 'ungrouped') res = res.filter((p: any) => !p.isGrouped);
+    return res;
+  }, [matrixData?.parties, matrixSearch, matrixFilter]);
+
+  const displayGroups = useMemo(() => {
+    const source = matrixData?.groups || [];
+    const clean = matrixSearch.trim().toLowerCase();
+    if (!clean) return source;
+    return source.filter((g: any) =>
+      (g.groupName || '').toLowerCase().includes(clean) ||
+      (g.parties || []).some((p: string) => p.toLowerCase().includes(clean))
+    );
+  }, [matrixData?.groups, matrixSearch]);
+
+  const displayDeclaredLedgers = useMemo(() => {
+    const source = declareLedgers || [];
+    const clean = declareSearch.trim().toLowerCase();
+    let res = source;
+    if (clean) {
+      res = res.filter((l: any) =>
+        (l.partyName || '').toLowerCase().includes(clean) ||
+        (l.targetBranchCode || l.mappedBranchCode || '').toLowerCase().includes(clean) ||
+        (l.branchName || '').toLowerCase().includes(clean)
+      );
+    }
+    if (declaredOnlyFilter) {
+      res = res.filter((l: any) => !!l.isDeclared || !!l.targetBranchCode || !!l.mappedBranchCode);
+    }
+    return res;
+  }, [declareLedgers, declareSearch, declaredOnlyFilter]);
+
+  const displayExceptions = useMemo(() => {
+    const source = exceptions || [];
+    const clean = exceptionsSearch.trim().toLowerCase();
+    if (!clean) return source;
+    return source.filter((e: any) =>
+      (e.voucherNo || '').toLowerCase().includes(clean) ||
+      (e.narration || '').toLowerCase().includes(clean) ||
+      (e.partyName || '').toLowerCase().includes(clean) ||
+      (e.lines || []).some((l: any) => (l.account || '').toLowerCase().includes(clean))
+    );
+  }, [exceptions, exceptionsSearch]);
+
+  const displayIbRows = useMemo(() => {
+    const source = ibData?.rows || [];
+    const clean = ibSearch.trim().toLowerCase();
+    if (!clean) return source;
+    return source.filter((row: any) => {
+      const v1 = (row.voucher1?.voucherNo || '').toLowerCase();
+      const n1 = (row.voucher1?.narration || '').toLowerCase();
+      const a1 = (row.voucher1?.account || '').toLowerCase();
+      const v2 = (row.voucher2?.voucherNo || '').toLowerCase();
+      const n2 = (row.voucher2?.narration || '').toLowerCase();
+      const a2 = (row.voucher2?.account || '').toLowerCase();
+      return v1.includes(clean) || n1.includes(clean) || a1.includes(clean) || v2.includes(clean) || n2.includes(clean) || a2.includes(clean);
+    });
+  }, [ibData?.rows, ibSearch]);
+
+  const displayGroupParties = useMemo(() => {
+    const source = groupParties || [];
+    const clean = groupSearch.trim().toLowerCase();
+    if (!clean) return source;
+    return source.filter((p: any) =>
+      (p.partyName || '').toLowerCase().includes(clean) ||
+      (p.groupName || '').toLowerCase().includes(clean)
+    );
+  }, [groupParties, groupSearch]);
+
+  // Debounced server-side sync in background
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const timer = setTimeout(() => {
+      fetchMatrix(selectedCompanyId, matrixSearch, matrixFilter);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [matrixSearch, matrixFilter, selectedCompanyId]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const timer = setTimeout(() => {
+      fetchDeclaredLedgers(selectedCompanyId, declareSearch, declaredOnlyFilter);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [declareSearch, declaredOnlyFilter, selectedCompanyId]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const timer = setTimeout(() => {
+      fetchExceptions(selectedCompanyId, exceptionsSearch);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [exceptionsSearch, selectedCompanyId]);
+
   useEffect(() => {
     fetchCompanies();
   }, []);
@@ -187,6 +319,7 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.success) {
         setMatrixData(json);
+        dispatch(setReduxMatrixData(json));
       }
     } catch (err) {
       console.error(err);
@@ -207,6 +340,7 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.success) {
         setDeclareLedgers(json.ledgers || []);
+        dispatch(setReduxDeclaredLedgers(json.ledgers || []));
         setAvailableDeclaredCodes(json.declaredCodes || []);
       }
     } catch (err) {
@@ -226,6 +360,7 @@ export default function Dashboard() {
       const json = await res.json();
       if (json.success) {
         setExceptions(json.exceptions || []);
+        dispatch(setReduxExceptions(json.exceptions || []));
         setExceptionsSummary({
           totalExceptions: json.totalExceptions ?? (json.exceptions || []).length,
           totalIgnoredAmount: json.totalIgnoredAmount || 0,
@@ -941,17 +1076,34 @@ export default function Dashboard() {
 
             <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
-                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-96 shadow-inner">
+                  <Search className="w-4 h-4 text-indigo-600 shrink-0" />
                   <input
                     type="text"
-                    placeholder="पार्टी या लेजर का नाम खोजें..."
+                    placeholder="पार्टी या लेजर का नाम खोजें (उदा. uttar, inf, cash)..."
                     value={matrixSearch}
-                    onChange={(e) => setMatrixSearch(e.target.value)}
-                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMatrixSearch(val);
+                      dispatch(setReduxMatrixSearch(val));
+                    }}
+                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
+                    autoComplete="off"
                   />
                   {matrixSearch && (
-                    <button onClick={() => setMatrixSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
+                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded shrink-0 animate-fade-in font-mono">
+                      {matrixViewMode === 'groups' ? displayGroups.length : displayParties.length} मिले
+                    </span>
+                  )}
+                  {matrixSearch && (
+                    <button
+                      onClick={() => {
+                        setMatrixSearch('');
+                        dispatch(setReduxMatrixSearch(''));
+                      }}
+                      className="text-slate-400 hover:text-rose-600 text-xs px-1 active:scale-95"
+                      title="Clear search"
+                    >
                       ✕
                     </button>
                   )}
@@ -1083,18 +1235,20 @@ export default function Dashboard() {
                     {/* VIEW 1: GROUP VIEW */}
                     {!matrixLoading && matrixViewMode === 'groups' && (
                       <>
-                        {(!matrixData?.groups || matrixData.groups.length === 0) ? (
+                        {displayGroups.length === 0 ? (
                           <tr>
                             <td colSpan={6 + (matrixData?.branches?.length || 0)} className="py-12 text-center text-slate-400">
                               <Boxes className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                              <p className="font-semibold text-slate-600">कोई लेजर ग्रुप नहीं मिला</p>
+                              <p className="font-semibold text-slate-600">
+                                {matrixSearch ? `खोज "${matrixSearch}" से कोई ग्रुप नहीं मिला` : 'कोई लेजर ग्रुप नहीं मिला'}
+                              </p>
                               <p className="text-xs text-slate-400 mt-1">
-                                "लेजर ग्रुपिंग" टैब में जाकर लेजर्स को ग्रुप में समूहित करें।
+                                {matrixSearch ? 'कृपया अलग कीवर्ड से खोजें' : '"लेजर ग्रुपिंग" टैब में जाकर लेजर्स को ग्रुप में समूहित करें।'}
                               </p>
                             </td>
                           </tr>
                         ) : (
-                          matrixData.groups.map((g: any) => (
+                          displayGroups.map((g: any) => (
                             <tr
                               key={g.groupName}
                               onClick={() => setSelectedGroupModal(g.groupName)}
@@ -1183,16 +1337,23 @@ export default function Dashboard() {
                     )}
 
                     {/* VIEW 2: INDIVIDUAL VIEW */}
-                    {!matrixLoading && matrixViewMode === 'individual' && (!matrixData?.parties || matrixData.parties.length === 0) && (
+                    {!matrixLoading && matrixViewMode === 'individual' && displayParties.length === 0 && (
                       <tr>
                         <td colSpan={6 + (matrixData?.branches?.length || 0)} className="py-12 text-center text-slate-400">
                           <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                          <p className="font-semibold text-slate-600">No party ledger entries found</p>
+                          <p className="font-semibold text-slate-600">
+                            {matrixSearch ? `खोज "${matrixSearch}" से कोई पार्टी या लेजर नहीं मिला` : 'No party ledger entries found'}
+                          </p>
+                          {matrixSearch && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              कृपया अलग स्पेलिंग या ब्रांच कोड डालकर देखें।
+                            </p>
+                          )}
                         </td>
                       </tr>
                     )}
 
-                    {!matrixLoading && matrixViewMode === 'individual' && matrixData?.parties?.map((p: any) => (
+                    {!matrixLoading && matrixViewMode === 'individual' && displayParties.map((p: any) => (
                       <tr
                         key={p.partyName}
                         onClick={() => setSelectedParty(p.partyName)}
@@ -1384,17 +1545,32 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
-                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-96 shadow-inner">
+                <Search className="w-4 h-4 text-purple-600 shrink-0" />
                 <input
                   type="text"
                   placeholder="लेजर का नाम फ़िल्टर करें..."
                   value={declareSearch}
-                  onChange={(e) => setDeclareSearch(e.target.value)}
-                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDeclareSearch(val);
+                    dispatch(setReduxDeclareSearch(val));
+                  }}
+                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
                 />
                 {declareSearch && (
-                  <button onClick={() => setDeclareSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
+                  <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded shrink-0 font-mono">
+                    {displayDeclaredLedgers.length} मिले
+                  </span>
+                )}
+                {declareSearch && (
+                  <button
+                    onClick={() => {
+                      setDeclareSearch('');
+                      dispatch(setReduxDeclareSearch(''));
+                    }}
+                    className="text-slate-400 hover:text-rose-600 text-xs px-1"
+                  >
                     ✕
                   </button>
                 )}
@@ -1460,15 +1636,15 @@ export default function Dashboard() {
                       </tr>
                     )}
 
-                    {!declareLoading && declareLedgers.length === 0 && (
+                    {!declareLoading && displayDeclaredLedgers.length === 0 && (
                       <tr>
                         <td colSpan={8} className="py-12 text-center text-slate-400">
-                          No ledgers found matching criteria
+                          {declareSearch ? `खोज "${declareSearch}" से कोई लेजर नहीं मिला` : 'No ledgers found matching criteria'}
                         </td>
                       </tr>
                     )}
 
-                    {!declareLoading && declareLedgers.map((item) => {
+                    {!declareLoading && displayDeclaredLedgers.map((item) => {
                       const isSelected = declareSelectedNames.includes(item.partyName);
                       return (
                         <tr
@@ -1748,17 +1924,22 @@ export default function Dashboard() {
                   </div>
 
                   {/* Search Bar */}
-                  <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2">
-                    <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 shadow-inner">
+                    <Search className="w-4 h-4 text-purple-600 shrink-0" />
                     <input
                       type="text"
                       placeholder="पार्टी का नाम खोजें (उदा. Amol, Bansal)..."
                       value={groupSearch}
                       onChange={(e) => setGroupSearch(e.target.value)}
-                      className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                      className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
                     />
                     {groupSearch && (
-                      <button onClick={() => setGroupSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
+                      <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded shrink-0 font-mono">
+                        {displayGroupParties.length} मिले
+                      </span>
+                    )}
+                    {groupSearch && (
+                      <button onClick={() => setGroupSearch('')} className="text-slate-400 hover:text-rose-600 text-xs px-1">
                         ✕
                       </button>
                     )}
@@ -1772,12 +1953,12 @@ export default function Dashboard() {
                           <th className="px-3 py-2.5 text-center w-10">
                             <input
                               type="checkbox"
-                              checked={groupParties.length > 0 && groupSelectedParties.length === groupParties.length}
+                              checked={displayGroupParties.length > 0 && groupSelectedParties.length === displayGroupParties.length}
                               onChange={() => {
-                                if (groupSelectedParties.length === groupParties.length) {
+                                if (groupSelectedParties.length === displayGroupParties.length) {
                                   setGroupSelectedParties([]);
                                 } else {
-                                  setGroupSelectedParties(groupParties.map(p => p.partyName));
+                                  setGroupSelectedParties(displayGroupParties.map(p => p.partyName));
                                 }
                               }}
                               className="rounded text-purple-600 focus:ring-purple-500 cursor-pointer p-1"
@@ -1789,14 +1970,14 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
-                        {groupParties.length === 0 ? (
+                        {displayGroupParties.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="py-8 text-center text-slate-400">
-                              No accounts found matching search
+                              {groupSearch ? `खोज "${groupSearch}" से कोई पार्टी नहीं मिली` : 'No accounts found'}
                             </td>
                           </tr>
                         ) : (
-                          groupParties.map((p) => {
+                          displayGroupParties.map((p) => {
                             const isChecked = groupSelectedParties.includes(p.partyName);
                             return (
                               <tr
@@ -2139,17 +2320,22 @@ export default function Dashboard() {
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 w-full sm:w-64">
-                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 w-full sm:w-72 shadow-inner">
+                  <Search className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
                   <input
                     type="text"
                     placeholder="वाउचर नं, तारीख या राशि..."
                     value={ibSearch}
                     onChange={(e) => setIbSearch(e.target.value)}
-                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                    className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
                   />
                   {ibSearch && (
-                    <button onClick={() => setIbSearch('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
+                    <span className="text-[10px] bg-cyan-100 text-cyan-800 font-bold px-1.5 py-0.5 rounded shrink-0 font-mono">
+                      {displayIbRows.length} मिले
+                    </span>
+                  )}
+                  {ibSearch && (
+                    <button onClick={() => setIbSearch('')} className="text-slate-400 hover:text-rose-600 text-xs px-1">
                       ✕
                     </button>
                   )}
@@ -2281,25 +2467,27 @@ export default function Dashboard() {
                       </tr>
                     )}
 
-                    {!ibLoading && (!ibData?.rows || ibData.rows.length === 0) && (
+                    {!ibLoading && displayIbRows.length === 0 && (
                       <tr>
                         <td colSpan={11} className="py-16 text-center text-slate-400">
                           <div className="max-w-sm mx-auto space-y-2">
                             <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                             <p className="font-bold text-slate-700 text-sm">
-                              {ibStatusFilter === 'mismatch_only' 
+                              {ibSearch 
+                                ? `खोज "${ibSearch}" से कोई वाउचर नहीं मिला`
+                                : ibStatusFilter === 'mismatch_only' 
                                 ? 'बधाई! कोई मिसमैच प्रविष्टि नहीं पाई गई (0 Mismatches).'
                                 : 'No entries found matching criteria.'}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {ibStatusFilter === 'mismatch_only' && 'दोनों ब्रांचेस के सभी वाउचर्स पूर्ण रूप से मेल खाते हैं।'}
+                              {ibStatusFilter === 'mismatch_only' && !ibSearch && 'दोनों ब्रांचेस के सभी वाउचर्स पूर्ण रूप से मेल खाते हैं।'}
                             </p>
                           </div>
                         </td>
                       </tr>
                     )}
 
-                    {!ibLoading && ibData?.rows?.map((row: any, idx: number) => {
+                    {!ibLoading && displayIbRows.map((row: any, idx: number) => {
                       const isMatched = row.matchStatus === 'MATCHED';
                       const isMissingInB2 = row.matchStatus === 'MISSING_IN_B2';
                       const isMissingInB1 = row.matchStatus === 'MISSING_IN_B1';
@@ -2492,17 +2680,32 @@ export default function Dashboard() {
 
             {/* Filter Search */}
             <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-80">
-                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <div className="flex items-center space-x-2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 w-full sm:w-96 shadow-inner">
+                <Search className="w-4 h-4 text-rose-600 shrink-0" />
                 <input
                   type="text"
                   placeholder="खोजें (Search party, voucher no, type)..."
                   value={exceptionsSearch}
-                  onChange={(e) => setExceptionsSearch(e.target.value)}
-                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setExceptionsSearch(val);
+                    dispatch(setReduxExceptionsSearch(val));
+                  }}
+                  className="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full font-medium"
                 />
                 {exceptionsSearch && (
-                  <button onClick={() => setExceptionsSearch('')} className="text-slate-400 hover:text-slate-600 text-xs p-1">
+                  <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded shrink-0 font-mono">
+                    {displayExceptions.length} मिले
+                  </span>
+                )}
+                {exceptionsSearch && (
+                  <button
+                    onClick={() => {
+                      setExceptionsSearch('');
+                      dispatch(setReduxExceptionsSearch(''));
+                    }}
+                    className="text-slate-400 hover:text-rose-600 text-xs p-1"
+                  >
                     ✕
                   </button>
                 )}
@@ -2549,17 +2752,21 @@ export default function Dashboard() {
                       </tr>
                     )}
 
-                    {!exceptionsLoading && exceptions.length === 0 && (
+                    {!exceptionsLoading && displayExceptions.length === 0 && (
                       <tr>
                         <td colSpan={8} className="py-12 text-center text-slate-400">
                           <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                          <p className="font-bold text-slate-700">कोई एक्सेप्शन एंट्री नहीं है (No Ignored Entries)</p>
-                          <p className="text-xs text-slate-400 mt-0.5">सभी एंट्रियां लेजर में सक्रिय हैं। जब आप किसी लेजर से किसी गलत एंट्री को 'Ignore' करेंगे, वह यहाँ दिखाई देगी।</p>
+                          <p className="font-bold text-slate-700">
+                            {exceptionsSearch ? `खोज "${exceptionsSearch}" से कोई एंट्री नहीं मिली` : 'कोई एक्सेप्शन एंट्री नहीं है (No Ignored Entries)'}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {exceptionsSearch ? 'कृपया अलग कीवर्ड डालकर खोजें।' : "सभी एंट्रियां लेजर में सक्रिय हैं। जब आप किसी लेजर से किसी गलत एंट्री को 'Ignore' करेंगे, वह यहाँ दिखाई देगी।"}
+                          </p>
                         </td>
                       </tr>
                     )}
 
-                    {!exceptionsLoading && exceptions.map((item) => (
+                    {!exceptionsLoading && displayExceptions.map((item) => (
                       <tr key={item.id} className="hover:bg-rose-50/40 transition">
                         <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-slate-600 font-mono sticky left-0 z-10 bg-white sticky-shadow-right">
                           {item.dateStr}

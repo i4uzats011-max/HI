@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { invalidateCompanyCache } from '@/lib/cache';
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
         }
       );
     }
+
+    // Invalidate company cache
+    await invalidateCompanyCache(companyId);
 
     return NextResponse.json({
       success: true,

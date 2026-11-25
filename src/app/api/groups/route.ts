@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { invalidateCompanyCache } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,6 +206,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Invalidate company cache
+    await invalidateCompanyCache(companyId);
+
     return NextResponse.json({
       success: true,
       message: `${names.length} ledger(s) successfully assigned to group "${cleanGroupName}"`
@@ -243,6 +247,7 @@ export async function DELETE(req: NextRequest) {
           }
         )
       ]);
+      await invalidateCompanyCache(companyId);
       return NextResponse.json({ success: true, message: `Removed "${partyName}" from its group` });
     }
 
@@ -260,6 +265,7 @@ export async function DELETE(req: NextRequest) {
           }
         )
       ]);
+      await invalidateCompanyCache(companyId);
       return NextResponse.json({ success: true, message: `Group "${groupName}" deleted successfully` });
     }
 

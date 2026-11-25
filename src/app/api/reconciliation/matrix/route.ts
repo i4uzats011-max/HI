@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { getCache, setCache } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,12 @@ export async function GET(req: NextRequest) {
 
     if (!companyId) {
       return NextResponse.json({ success: false, error: 'companyId is required' }, { status: 400 });
+    }
+
+    const cacheKey = `company:${companyId}:matrix:${search}:${filterType}`;
+    const cachedData = await getCache<any>(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
     }
 
     const { db } = await connectToDatabase();
@@ -197,7 +204,7 @@ export async function GET(req: NextRequest) {
       if (p.branchesCount > 1) multiBranchCount++;
     }
 
-    return NextResponse.json({
+    const responsePayload = {
       success: true,
       branches: branches.map(b => ({ id: b._id.toString(), name: b.name, code: b.code })),
       parties,
@@ -211,7 +218,12 @@ export async function GET(req: NextRequest) {
         totalPayable: Math.round(totalPayable * 100) / 100,
         netConsolidated: Math.round((totalReceivable - totalPayable) * 100) / 100
       }
-    });
+    };
+
+    // Cache matrix for 3 minutes
+    await setCache(cacheKey, responsePayload, 180);
+
+    return NextResponse.json(responsePayload);
 
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

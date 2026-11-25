@@ -47,6 +47,11 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
   const [showCodeInput, setShowCodeInput] = useState<boolean>(false);
   const [targetCode, setTargetCode] = useState<string>('');
   const [savingCode, setSavingCode] = useState<boolean>(false);
+  const [displayLimit, setDisplayLimit] = useState<number>(100);
+
+  useEffect(() => {
+    setDisplayLimit(100);
+  }, [selectedBranch, selectedVType, txnSearch, isGroupMode]);
 
   useEffect(() => {
     if (!partyName && !groupName) return;
@@ -196,6 +201,10 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
 
   const debitTxns = filteredTxns.filter((t: any) => t.debit > 0);
   const creditTxns = filteredTxns.filter((t: any) => t.credit > 0);
+
+  const visibleTxns = filteredTxns.slice(0, displayLimit);
+  const visibleDebitTxns = debitTxns.slice(0, displayLimit);
+  const visibleCreditTxns = creditTxns.slice(0, displayLimit);
 
   const formatCurrency = (val: number) => {
     return '₹' + (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -598,7 +607,7 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
                             </td>
                           </tr>
                         ) : (
-                          filteredTxns.map((t: any) => (
+                          visibleTxns.map((t: any) => (
                             <tr key={t.id} className="group hover:bg-indigo-50/50 transition">
                               <td className="px-3 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap text-slate-700 font-mono font-semibold sticky left-0 z-10 bg-white group-hover:bg-indigo-50/80 sticky-shadow-right">
                                 {t.dateStr}
@@ -661,6 +670,29 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
                       </tbody>
                     </table>
                   </div>
+
+                  {/* High performance pagination / batch loader for large transaction lists */}
+                  {filteredTxns.length > displayLimit && (
+                    <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+                      <span className="text-slate-600 font-medium">
+                        कुल {filteredTxns.length} में से <b>{visibleTxns.length}</b> प्रविष्टियां दिखाई जा रही हैं
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setDisplayLimit(prev => Math.min(prev + 100, filteredTxns.length))}
+                          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg border border-indigo-200 transition active:scale-95"
+                        >
+                          +100 और लोड करें (+100 More)
+                        </button>
+                        <button
+                          onClick={() => setDisplayLimit(filteredTxns.length)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition active:scale-95 shadow-sm"
+                        >
+                          सभी दिखाएं (Show All {filteredTxns.length})
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

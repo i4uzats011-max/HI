@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { parseDayBookContent } from '@/lib/tallyParser';
+import { invalidateCompanyCache } from '@/lib/cache';
 import fs from 'fs';
 import path from 'path';
 
@@ -252,6 +253,9 @@ export async function POST(req: NextRequest) {
       const chunk = bulkOps.slice(i, i + chunkSize);
       await db.collection('party_balances').bulkWrite(chunk, { ordered: false });
     }
+
+    // Invalidate caches for this company so all new data reflects immediately
+    await invalidateCompanyCache(companyId);
 
     return NextResponse.json({
       success: true,

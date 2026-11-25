@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { invalidateCachePattern } from '@/lib/cache';
 
 export async function POST(req: NextRequest) {
   try {
     const { type, companyId, branchId, resetRules } = await req.json();
     const { db } = await connectToDatabase();
+
+    // Invalidate cache immediately
+    await invalidateCachePattern('company:');
 
     if (type === 'transactions') {
       // Clear vouchers and party_balances across all companies, keeping mappings & groups intact
