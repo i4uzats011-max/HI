@@ -131,28 +131,17 @@ export async function GET(req: NextRequest) {
       totalCount: number;
     }>();
 
-    // Fetch all party balances for these target accounts across all branches in company
-    const allPartyBalances = await db.collection('party_balances').find({
-      companyId,
-      partyName: { $in: targetAccounts }
-    }).toArray();
-
-    for (const pb of allPartyBalances) {
-      const bName = branchNameMap.get(pb.branchId) || pb.branchName || 'Branch';
-      if (!branchBreakdownMap.has(pb.branchId)) {
-        branchBreakdownMap.set(pb.branchId, {
-          branchId: pb.branchId,
-          branchName: bName,
-          totalDebit: 0,
-          totalCredit: 0,
-          voucherCounts: {},
-          totalCount: 0
-        });
-      }
-      const bItem = branchBreakdownMap.get(pb.branchId)!;
-      bItem.totalDebit += (pb.totalDebit || 0);
-      bItem.totalCredit += (pb.totalCredit || 0);
-      bItem.totalCount += (pb.voucherCount || 0);
+    // Pre-populate branches for this company
+    for (const b of branches) {
+      const bId = b._id.toString();
+      branchBreakdownMap.set(bId, {
+        branchId: bId,
+        branchName: b.name,
+        totalDebit: 0,
+        totalCredit: 0,
+        voucherCounts: {},
+        totalCount: 0
+      });
     }
 
     const transactions: any[] = [];
@@ -189,7 +178,7 @@ export async function GET(req: NextRequest) {
       voucherTypeCounts[vtKey].debit += vDebit;
       voucherTypeCounts[vtKey].credit += vCredit;
 
-      // Update branch breakdown
+      // Update branch breakdown directly from active vouchers
       const bId = v.branchId;
       const bName = branchNameMap.get(bId) || v.branchName || 'Branch';
       if (!branchBreakdownMap.has(bId)) {
@@ -203,6 +192,9 @@ export async function GET(req: NextRequest) {
         });
       }
       const bStats = branchBreakdownMap.get(bId)!;
+      bStats.totalDebit += vDebit;
+      bStats.totalCredit += vCredit;
+      bStats.totalCount++;
       bStats.voucherCounts[vtKey] = (bStats.voucherCounts[vtKey] || 0) + 1;
 
       if (!vTypeFilter || vTypeFilter === 'all' || v.voucherType === vTypeFilter) {
@@ -254,7 +246,9 @@ export async function GET(req: NextRequest) {
         totalTransactions: vouchers.length
       },
       voucherTypeCounts,
-      branchBreakdowns: Array.from(branchBreakdownMap.values()).map(b => {
+      branchBreakdowns: Array.from(branchBreakdownMap.values())
+        .filter(b => b.totalCount > 0 || b.totalDebit > 0 || b.totalCredit > 0 || branchBreakdownMap.size <= 1)
+        .map(b => {
         const net = Math.round((b.totalDebit - b.totalCredit) * 100) / 100;
         return {
           ...b,

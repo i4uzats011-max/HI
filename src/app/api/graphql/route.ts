@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { graphql, buildSchema } from 'graphql';
 import { connectToDatabase } from '@/lib/mongodb';
-import { getCache, setCache } from '@/lib/cache';
+import { getCache, setCache, invalidateCompanyCache } from '@/lib/cache';
+import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,10 +65,20 @@ const schema = buildSchema(`
     transactions: [LedgerTransaction!]!
   }
 
+  type IgnoreResult {
+    success: Boolean!
+    message: String!
+    affectedAccounts: [String!]!
+  }
+
   type Query {
     searchParties(companyId: String!, query: String!): [PartyBalance!]!
     matrix(companyId: String!, search: String, filter: String): MatrixResult!
     ledger(companyId: String!, partyName: String!, branchId: String): LedgerResult!
+  }
+
+  type Mutation {
+    toggleIgnoreVoucher(voucherId: String!, isIgnored: Boolean!, reason: String): IgnoreResult!
   }
 `);
 
@@ -252,6 +263,97 @@ const root = {
         totalTransactions: vouchers.length
       },
       transactions
+    };
+  },
+
+  // Fast GraphQL Mutation to Toggle Ignore Voucher with Dual-Sided Double-Entry Propagation
+  toggleIgnoreVoucher: async ({ voucherId, isIgnored, reason }: { voucherId: string; isIgnored: boolean; reason?: string }) => {
+    const { db } = await connectToDatabase();
+    const vId = new ObjectId(voucherId);
+
+    const voucher = await db.collection('vouchers').findOne({ _id: vId });
+    if (!voucher) {
+      throw new Error('Voucher not found');
+    }
+
+    const shouldIgnore = isIgnored !== false;
+
+    await db.collection('vouchers').updateOne(
+      { _id: vId },
+      {
+        $set: {
+          isIgnored: shouldIgnore,
+          ignoredAt: shouldIgnore ? new Date() : null,
+          ignoredReason: shouldIgnore ? (reason || 'Marked as incorrect / ignored by user') : null
+        }
+      }
+    );
+
+    // Extract all accounts from this voucher (Both Dr and Cr sides)
+    const rawParties: string[] = (voucher.lines || []).map((l: any) => (l.account || '').trim()).filter(Boolean);
+    const affectedParties: string[] = Array.from(new Set(rawParties));
+    const companyId = voucher.companyId;
+    const branchId = voucher.branchId;
+    const branchIdsToUpdate = Array.from(new Set([branchId, voucher.targetBranchId].filter(Boolean)));
+
+    for (const bId of branchIdsToUpdate) {
+      for (const party of affectedParties) {
+        const partyRegex = new RegExp(`^${party.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+        const activeVouchers = await db.collection('vouchers').find({
+          companyId,
+          branchId: bId,
+          "lines.account": { $regex: partyRegex },
+          isIgnored: { $ne: true }
+        }).toArray();
+
+        let totalDr = 0;
+        let totalCr = 0;
+        const vTypes: { [vt: string]: { count: number; debit: number; credit: number } } = {};
+
+        for (const v of activeVouchers) {
+          const vt = v.voucherType || 'Other';
+          if (!vTypes[vt]) vTypes[vt] = { count: 0, debit: 0, credit: 0 };
+          vTypes[vt].count++;
+
+          for (const line of (v.lines || [])) {
+            const lineAcct = (line.account || '').trim();
+            if (lineAcct.toLowerCase() === party.toLowerCase()) {
+              totalDr += (line.debit || 0);
+              totalCr += (line.credit || 0);
+              vTypes[vt].debit += (line.debit || 0);
+              vTypes[vt].credit += (line.credit || 0);
+            }
+          }
+        }
+
+        const net = Math.round((totalDr - totalCr) * 100) / 100;
+
+        await db.collection('party_balances').updateOne(
+          { companyId, branchId: bId, partyName: { $regex: partyRegex } },
+          {
+            $set: {
+              totalDebit: Math.round(totalDr * 100) / 100,
+              totalCredit: Math.round(totalCr * 100) / 100,
+              netBalance: net,
+              status: net > 0.01 ? 'Dr' : (net < -0.01 ? 'Cr' : 'Nil'),
+              voucherCount: activeVouchers.length,
+              voucherTypes: vTypes,
+              updatedAt: new Date()
+            }
+          }
+        );
+      }
+    }
+
+    await invalidateCompanyCache(companyId);
+
+    return {
+      success: true,
+      message: shouldIgnore
+        ? `एंट्री को इग्नोर कर दिया गया। दोनों खातों (${affectedParties.join(' व ')}) से इसका प्रभाव हटा दिया गया।`
+        : `एंट्री को पुनः बहाल कर दिया गया।`,
+      affectedAccounts: affectedParties
     };
   }
 };

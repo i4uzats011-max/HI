@@ -94,7 +94,7 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
 
   // Handle Ignore Voucher
   async function handleIgnoreVoucher(voucherId: string) {
-    if (!confirm('क्या आप इस गलत/अमान्य एंट्री को इग्नोर करना चाहते हैं? यह लेजर और बैलेंस से हटकर एक्सेप्शंस रिपोर्ट में चली जाएगी।')) {
+    if (!confirm('क्या आप इस एंट्री को इग्नोर करना चाहते हैं? इसका पूरा प्रभाव (डेबिट और क्रेडिट दोनों खातों से) हटकर एक्सेप्शंस रिपोर्ट में चला जाएगा।')) {
       return;
     }
 
@@ -111,8 +111,8 @@ export default function PartyLedgerModal({ partyName, groupName, companyId, onCl
       });
       const json = await res.json();
       if (json.success) {
-        setActionSuccessMsg('एंट्री लेजर से इग्नोर कर दी गई और एक्सेप्शंस रिपोर्ट में भेज दी गई।');
-        setTimeout(() => setActionSuccessMsg(null), 4000);
+        setActionSuccessMsg(json.message || 'एंट्री लेजर से इग्नोर कर दी गई। दोनों खातों से इसका पूरा डेबिट और क्रेडिट प्रभाव हटा दिया गया है।');
+        setTimeout(() => setActionSuccessMsg(null), 5000);
         await fetchLedger();
         if (onVoucherIgnored) onVoucherIgnored();
       } else {

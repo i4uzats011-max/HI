@@ -28,8 +28,18 @@ export async function GET(req: NextRequest) {
     const ignoredVouchers = await db.collection('vouchers').find(query).sort({ ignoredAt: -1, date: -1 }).toArray();
 
     let items = ignoredVouchers.map(v => {
-      const primaryLine = v.lines?.[0] || {};
-      const counterLine = v.lines?.[1] || {};
+      const debitLines = (v.lines || []).filter((l: any) => (l.debit || 0) > 0);
+      const creditLines = (v.lines || []).filter((l: any) => (l.credit || 0) > 0);
+
+      const debitAccounts = debitLines.map((l: any) => l.account).filter(Boolean);
+      const creditAccounts = creditLines.map((l: any) => l.account).filter(Boolean);
+
+      const totalDr = debitLines.reduce((s: number, l: any) => s + (l.debit || 0), 0);
+      const totalCr = creditLines.reduce((s: number, l: any) => s + (l.credit || 0), 0);
+      const vAmount = Math.max(totalDr, totalCr);
+
+      const drPartyText = debitAccounts.join(', ') || v.primaryParty || 'Debit Account';
+      const crPartyText = creditAccounts.join(', ') || 'Credit Account';
 
       return {
         id: v._id.toString(),
@@ -37,15 +47,20 @@ export async function GET(req: NextRequest) {
         dateStr: v.dateStr,
         branchId: v.branchId,
         branchName: v.branchName,
+        branchCode: v.branchCode,
         voucherType: v.voucherType,
         voucherNo: v.voucherNo || '-',
-        primaryParty: v.primaryParty || primaryLine.account || '',
-        counterAccount: counterLine.account || '',
-        amount: Math.abs(primaryLine.amount || primaryLine.debit || primaryLine.credit || 0),
-        debit: primaryLine.debit || 0,
-        credit: primaryLine.credit || 0,
+        primaryParty: drPartyText,
+        counterAccount: crPartyText,
+        debitAccount: drPartyText,
+        creditAccount: crPartyText,
+        amount: Math.round(vAmount * 100) / 100,
+        debit: Math.round(totalDr * 100) / 100,
+        credit: Math.round(totalCr * 100) / 100,
+        bothSidesIgnored: true,
+        affectedAccounts: Array.from(new Set([...debitAccounts, ...creditAccounts])),
         ignoredAt: v.ignoredAt,
-        ignoredReason: v.ignoredReason || 'Marked as incorrect by user',
+        ignoredReason: v.ignoredReason || 'Marked as incorrect by user (Both Dr & Cr ignored)',
         lines: v.lines
       };
     });
@@ -55,8 +70,9 @@ export async function GET(req: NextRequest) {
         i.primaryParty.toLowerCase().includes(search) ||
         i.counterAccount.toLowerCase().includes(search) ||
         i.voucherNo.toLowerCase().includes(search) ||
-        i.branchName.toLowerCase().includes(search) ||
-        i.voucherType.toLowerCase().includes(search)
+        (i.branchName && i.branchName.toLowerCase().includes(search)) ||
+        (i.voucherType && i.voucherType.toLowerCase().includes(search)) ||
+        i.affectedAccounts.some(acc => acc.toLowerCase().includes(search))
       );
     }
 
@@ -70,6 +86,7 @@ export async function GET(req: NextRequest) {
       totalIgnoredAmount: Math.round(totalIgnoredAmount * 100) / 100,
       totalIgnoredDebit: Math.round(totalIgnoredDebit * 100) / 100,
       totalIgnoredCredit: Math.round(totalIgnoredCredit * 100) / 100,
+      isBalanced: Math.abs(totalIgnoredDebit - totalIgnoredCredit) < 0.01,
       exceptions: items
     });
 

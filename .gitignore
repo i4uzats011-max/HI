@@ -10,6 +10,18 @@
 .env.test.local
 .env.production.local
 *.env
+*.env.local
+
+# Local Data and Export Files - NEVER COMMIT TO GITHUB
+DayBook.CSV
+DayBook.csv
+DayBook.txt
+DayBook.TXT
+data/
+*.csv
+*.CSV
+*.xml
+*.XML
 
 # Next.js build output
 /.next/

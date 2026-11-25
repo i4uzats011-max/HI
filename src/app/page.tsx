@@ -545,7 +545,7 @@ export default function Dashboard() {
   }
 
   // Import Handler
-  async function handleImport(useSample = false) {
+  async function handleImport(useSample = false, sampleFileName = '') {
     if (!selectedCompanyId || !importBranchId) {
       showToast('कृपया पहले कंपनी और ब्रांच चुनें', 'error');
       return;
@@ -556,14 +556,15 @@ export default function Dashboard() {
 
     try {
       let res;
-      if (useSample) {
+      if (useSample || sampleFileName) {
         res = await fetch('/api/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId: selectedCompanyId,
             branchId: importBranchId,
-            useSampleFile: true,
+            useSampleFile: useSample,
+            sampleFileName: sampleFileName || undefined,
             clearExisting: importClearExisting
           })
         });
@@ -2640,39 +2641,51 @@ export default function Dashboard() {
             </div>
 
             {/* Exceptions Summary KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="bg-white border border-rose-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
                 <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600 shrink-0">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 font-semibold block">कुल इग्नोर की गई एंट्रियां</span>
+                  <span className="text-[11px] text-slate-500 font-semibold block">कुल इग्नोर एंट्रियां</span>
                   <span className="text-base sm:text-lg font-bold text-slate-900 font-mono">
                     {exceptionsSummary?.totalExceptions ?? exceptions.length} Entries
                   </span>
                 </div>
               </div>
 
-              <div className="bg-white border border-rose-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
+              <div className="bg-white border border-amber-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
                 <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 shrink-0">
-                  <Ban className="w-5 h-5" />
+                  <ArrowDownRight className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 font-semibold block">कुल इग्नोर राशि (Total Ignored)</span>
-                  <span className="text-base sm:text-lg font-bold text-rose-700 font-mono whitespace-nowrap">
-                    {formatCurrency(exceptionsSummary?.totalIgnoredAmount || 0)}
+                  <span className="text-[11px] text-slate-500 font-semibold block">कुल नाम प्रभाव (Dr Ignored)</span>
+                  <span className="text-base sm:text-lg font-bold text-amber-700 font-mono whitespace-nowrap">
+                    {formatCurrency(exceptionsSummary?.totalIgnoredDebit || exceptionsSummary?.totalIgnoredAmount || 0)}
                   </span>
                 </div>
               </div>
 
               <div className="bg-white border border-emerald-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
                 <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
+                  <ArrowUpRight className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 font-semibold block">रिकन्सिलेशन स्थिति</span>
-                  <span className="text-xs font-bold text-emerald-800 block">
-                    ✓ लेजर बैलेंस से सुरक्षित रूप से अलग
+                  <span className="text-[11px] text-slate-500 font-semibold block">कुल जमा प्रभाव (Cr Ignored)</span>
+                  <span className="text-base sm:text-lg font-bold text-emerald-700 font-mono whitespace-nowrap">
+                    {formatCurrency(exceptionsSummary?.totalIgnoredCredit || exceptionsSummary?.totalIgnoredAmount || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-indigo-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center space-x-3">
+                <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600 shrink-0">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-500 font-semibold block">डबल-एंट्री स्थिति</span>
+                  <span className="text-xs font-bold text-indigo-800 block">
+                    ✓ दोनों खातों से इग्नोर (Dr = Cr)
                   </span>
                 </div>
               </div>
@@ -2734,10 +2747,10 @@ export default function Dashboard() {
                       <th className="px-3 sm:px-4 py-3 sticky left-0 z-20 bg-slate-100 sticky-shadow-right whitespace-nowrap">Date (तारीख)</th>
                       <th className="px-3 sm:px-4 py-3 whitespace-nowrap">Branch (ब्रांच)</th>
                       <th className="px-3 sm:px-4 py-3 whitespace-nowrap">Type & Voucher No</th>
-                      <th className="px-3 sm:px-4 py-3 min-w-[140px]">पार्टी का नाम (Party Name)</th>
-                      <th className="px-3 sm:px-4 py-3 min-w-[130px]">काउंटर खाता (Counter Account)</th>
-                      <th className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">राशि (Amount)</th>
-                      <th className="px-3 sm:px-4 py-3 min-w-[140px]">इग्नोर कारण (Reason)</th>
+                      <th className="px-3 sm:px-4 py-3 min-w-[150px]">नाम खाता (Debit Side - Dr)</th>
+                      <th className="px-3 sm:px-4 py-3 min-w-[150px]">जमा खाता (Credit Side - Cr)</th>
+                      <th className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">इग्नोर राशि (Amount)</th>
+                      <th className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">डबल-एंट्री प्रभाव</th>
                       <th className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
@@ -2782,13 +2795,21 @@ export default function Dashboard() {
                           </span>
                           <span className="font-mono text-slate-700 font-semibold">{item.voucherNo}</span>
                         </td>
-                        <td className="px-3 sm:px-4 py-3 text-slate-900 font-bold whitespace-nowrap">{item.primaryParty}</td>
-                        <td className="px-3 sm:px-4 py-3 text-slate-600 whitespace-nowrap">{item.counterAccount || '-'}</td>
+                        <td className="px-3 sm:px-4 py-3 font-mono text-slate-900 font-semibold whitespace-nowrap">
+                          <span className="text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-bold mr-1">Dr</span>
+                          <span>{item.debitAccount || item.primaryParty}</span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 font-mono text-slate-900 font-semibold whitespace-nowrap">
+                          <span className="text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-bold mr-1">Cr</span>
+                          <span>{item.creditAccount || item.counterAccount || '-'}</span>
+                        </td>
                         <td className="px-3 sm:px-4 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           {formatCurrency(item.amount)}
                         </td>
-                        <td className="px-3 sm:px-4 py-3 text-slate-500 italic max-w-xs truncate" title={item.ignoredReason}>
-                          {item.ignoredReason}
+                        <td className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 inline-flex items-center space-x-1">
+                            <span>✓ दोनों खातों से इग्नोर</span>
+                          </span>
                         </td>
                         <td className="px-3 sm:px-4 py-3 text-center whitespace-nowrap">
                           <button
@@ -2945,19 +2966,19 @@ export default function Dashboard() {
                 <div className="border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center bg-slate-50/50 flex flex-col justify-between">
                   <div>
                     <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400 mx-auto mb-2" />
-                    <div className="text-xs sm:text-sm font-semibold text-slate-700">अपनी DayBook.txt / .CSV फ़ाइल चुनें</div>
-                    <p className="text-[11px] text-slate-400 mt-1">Supports Tally DayBook .TXT and .CSV export</p>
+                    <div className="text-xs sm:text-sm font-semibold text-slate-700">अपनी Tally XML (.xml) या DayBook (.txt / .csv) फ़ाइल चुनें</div>
+                    <p className="text-[11px] text-slate-400 mt-1">Supports Tally XML (.XML) & DayBook Alt+F1 (.CSV / .TXT)</p>
                     
                     <input
                       type="file"
-                      accept=".txt,.csv"
+                      accept=".xml,.txt,.csv"
                       onChange={(e) => setImportFile(e.target.files?.[0] || null)}
                       className="mt-3 block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                     />
 
                     {importFile && (
                       <div className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50 py-1 px-3 rounded-lg inline-block">
-                        Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                        Selected: {importFile.name} ({importFile.size > 1024 * 1024 ? (importFile.size / (1024 * 1024)).toFixed(2) + ' MB' : (importFile.size / 1024).toFixed(1) + ' KB'})
                       </div>
                     )}
                   </div>
@@ -2991,40 +3012,45 @@ export default function Dashboard() {
                   <div>
                     <div className="flex items-center space-x-2 text-indigo-700 font-bold text-xs sm:text-sm mb-1">
                       <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span>⚡ 1-Click Fast Import (Sample DayBook)</span>
+                      <span>⚡ 1-Click Fast Import (Sample Files)</span>
                     </div>
                     <p className="text-xs text-slate-600 mt-1 mb-3">
-                      डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">DayBook.CSV / DayBook.txt</code> को सीधे एक क्लिक में इस ब्रांच में इम्पोर्ट करें!
+                      डेस्कटॉप फ़ोल्डर की मूल <code className="bg-white px-1 py-0.5 rounded border border-indigo-200 text-indigo-900 font-bold">INFINITY LTD.xml / DayBook.CSV</code> को 1-क्लिक में इम्पोर्ट करें:
                     </p>
 
                     <div className="bg-white/80 rounded-xl p-3 border border-indigo-100 text-[11px] text-slate-600 space-y-1 mb-4">
-                      <div className="truncate">• Path: <code>c:\Users\USER\Desktop\BOOKS MATCH\DayBook.CSV</code></div>
-                      <div>• 100% Balanced vouchers (Total Dr == Total Cr, Sum == 0)</div>
-                      <div>• Stores directly in MongoDB <code>focustube</code> collection</div>
+                      <div>• <strong>Voucher-wise Validation:</strong> Dr == Cr बराबर होने पर ही इम्पोर्ट</div>
+                      <div>• <strong>Auto-Ignore Exceptions:</strong> असंतुलित एंट्रीज अपने आप अपवाद रिपोर्ट में दर्ज</div>
+                      <div>• <strong>Tally XML + Alt+F1 CSV:</strong> दोनों फॉर्मेट्स 100% समर्थित</div>
                     </div>
                   </div>
 
-                  <button
-                    disabled={importing}
-                    onClick={() => handleImport(true)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2 active:scale-95 touch-target-min ${
-                      importing
-                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white'
-                    }`}
-                  >
-                    {importing ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Processing vouchers...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>⚡ 1-Click Import Local DayBook</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      disabled={importing}
+                      onClick={() => handleImport(false, 'INFINITY LTD.xml')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-1.5 active:scale-95 touch-target-min ${
+                        importing
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>⚡ Import XML (88 MB)</span>
+                    </button>
+                    <button
+                      disabled={importing}
+                      onClick={() => handleImport(true)}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-1.5 active:scale-95 touch-target-min ${
+                        importing
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white'
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>⚡ Import CSV DayBook</span>
+                    </button>
+                  </div>
                 </div>
 
               </div>
